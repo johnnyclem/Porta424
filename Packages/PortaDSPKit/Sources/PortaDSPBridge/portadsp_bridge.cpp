@@ -1,5 +1,7 @@
 
 #include "PortaDSPBridge.h"
+#include "dsp_context.h"
+#include <algorithm>
 #include <atomic>
 #include <vector>
 #include <cmath>
@@ -12,6 +14,7 @@ struct PortaStubContext {
     std::atomic<porta_params_t> params;
     std::vector<float> rmsAcc;
     std::vector<int> rmsCount;
+    DSPContext dsp;
 };
 
 porta_dsp_handle porta_create(double sampleRate, int maxBlock, int tracks) {
@@ -21,6 +24,7 @@ porta_dsp_handle porta_create(double sampleRate, int maxBlock, int tracks) {
     ctx->tracks = tracks;
     porta_params_t p{};
     ctx->params.store(p, std::memory_order_relaxed);
+    ctx->dsp.prepare(sampleRate, tracks);
     ctx->rmsAcc.assign(8, 0.0f);
     ctx->rmsCount.assign(8, 0);
     return (porta_dsp_handle)ctx;
@@ -38,20 +42,23 @@ void porta_update_params(porta_dsp_handle h, const porta_params_t* p) {
 
 void porta_process_interleaved(porta_dsp_handle h, float* inter, int frames, int ch) {
     auto* ctx = (PortaStubContext*)h;
-    (void)ctx;
-    // STUB: pass-through + simple soft-clip to show wiring
-    for (int i=0;i<frames;i++) {
-        for (int c=0;c<ch;c++) {
-            float* s = &inter[i*ch + c];
-            float x = *s;
-            // tiny soft knee
-            float y = std::tanh(x);
-            *s = y;
-            // meter (very rough RMS accumulator)
-            int idx = c;
-            if (idx < (int)ctx->rmsAcc.size()) {
-                ctx->rmsAcc[idx] += y*y;
-                ctx->rmsCount[idx] += 1;
+    if (!ctx || !inter || frames <= 0 || ch <= 0) {
+        return;
+    }
+
+    const porta_params_t params = ctx->params.load(std::memory_order_acquire);
+    DSPContext::Parameters dspParams;
+    dspParams.dropoutRatePerMin = params.dropoutRatePerMin;
+    dspParams.nrTrack4Bypass = params.nrTrack4Bypass != 0;
+
+    ctx->dsp.process(inter, frames, ch, dspParams);
+
+    for (int i = 0; i < frames; ++i) {
+        for (int c = 0; c < ch; ++c) {
+            const float sample = inter[i * ch + c];
+            if (c < (int)ctx->rmsAcc.size()) {
+                ctx->rmsAcc[c] += sample * sample;
+                ctx->rmsCount[c] += 1;
             }
         }
     }
