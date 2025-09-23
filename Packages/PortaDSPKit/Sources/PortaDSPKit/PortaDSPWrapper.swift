@@ -27,19 +27,7 @@ public final class PortaDSP {
     deinit { if let h = handle { porta_destroy(h) } }
 
     public func update(_ p: Params) {
-        var c = porta_params_t(
-            wowDepth: p.wowDepth,
-            flutterDepth: p.flutterDepth,
-            headBumpGainDb: p.headBumpGainDb,
-            headBumpFreqHz: p.headBumpFreqHz,
-            satDriveDb: p.satDriveDb,
-            hissLevelDbFS: p.hissLevelDbFS,
-            lpfCutoffHz: p.lpfCutoffHz,
-            azimuthJitterMs: p.azimuthJitterMs,
-            crosstalkDb: p.crosstalkDb,
-            dropoutRatePerMin: p.dropoutRatePerMin,
-            nrTrack4Bypass: p.nrTrack4Bypass ? 1 : 0
-        )
+        var c = p.makeCParams()
         if let h = handle { porta_update_params(h, &c) }
     }
 
