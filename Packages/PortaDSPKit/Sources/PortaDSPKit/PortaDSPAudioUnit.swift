@@ -3,6 +3,11 @@ import AudioToolbox
 import AVFoundation
 import Foundation
 
+public enum PortaDSPAudioUnitError: Error {
+    case failedToCreateEngineNode
+    case unsupportedPlatform
+}
+
 public final class PortaDSPAudioUnit: AUAudioUnit {
     // MARK: Component Registration
 
@@ -25,6 +30,31 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
 
     public static func register() {
         _ = registration
+    }
+
+    public static func makeEngineNode(
+        engine: AVAudioEngine,
+        options: AudioComponentInstantiationOptions = [],
+        completionHandler: @escaping (AVAudioUnit?, PortaDSPAudioUnit?, Error?) -> Void
+    ) {
+        PortaDSPAudioUnit.register()
+        AVAudioUnit.instantiate(with: PortaDSPAudioUnit.componentDescription, options: options) { unit, error in
+            if let error {
+                completionHandler(nil, nil, error)
+                return
+            }
+            guard let resolvedUnit = unit else {
+                completionHandler(nil, nil, PortaDSPAudioUnitError.failedToCreateEngineNode)
+                return
+            }
+            engine.attach(resolvedUnit)
+            guard let dspUnit = resolvedUnit.auAudioUnit as? PortaDSPAudioUnit else {
+                engine.detach(resolvedUnit)
+                completionHandler(nil, nil, PortaDSPAudioUnitError.failedToCreateEngineNode)
+                return
+            }
+            completionHandler(resolvedUnit, dspUnit, nil)
+        }
     }
 
     // MARK: Lifecycle
@@ -271,6 +301,7 @@ public enum PortaDSPNodeFactory {
 import Foundation
 
 public enum PortaDSPAudioUnitError: Error {
+    case failedToCreateEngineNode
     case unsupportedPlatform
 }
 
@@ -305,6 +336,7 @@ public struct AudioComponentInstantiationOptions: OptionSet, Sendable {
 }
 
 public class AVAudioUnit {}
+public class AVAudioEngine {}
 
 public final class PortaDSPAudioUnit {
     public static let componentDescription = AudioComponentDescription()
@@ -317,6 +349,14 @@ public final class PortaDSPAudioUnit {
     }
 
     public static func register() {}
+
+    public static func makeEngineNode(
+        engine: AVAudioEngine,
+        options: AudioComponentInstantiationOptions = [],
+        completionHandler: @escaping (AVAudioUnit?, PortaDSPAudioUnit?, Error?) -> Void
+    ) {
+        completionHandler(nil, nil, PortaDSPAudioUnitError.unsupportedPlatform)
+    }
 }
 
 public enum PortaDSPNodeFactory {
