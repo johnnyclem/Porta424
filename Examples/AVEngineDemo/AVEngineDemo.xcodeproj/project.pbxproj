@@ -1,0 +1,465 @@
+// !$*UTF8*$!
+{
+archiveVersion = 1;
+classes = {};
+objectVersion = 56;
+objects = {
+
+/* Begin PBXBuildFile section */
+4B8B652D08DA45D191459292 /* AVEngineDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BECF72BD90F44DFBA12077D6 /* AVEngineDemoApp.swift */; };
+17E7AE4572354CEEA764ADF6 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 794492B83A0B4A869DC00766 /* ContentView.swift */; };
+5592D8A6DE934AF99A703B81 /* AudioEngineManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA4B58F3919E45878E8F9DE5 /* AudioEngineManager.swift */; };
+ACB09134D26A4CBE9D19E535 /* AVEngineDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BECF72BD90F44DFBA12077D6 /* AVEngineDemoApp.swift */; };
+A90349F9DC904BE799C4C30A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 794492B83A0B4A869DC00766 /* ContentView.swift */; };
+1CA8E8718A3C4DD3A6ACB8BD /* AudioEngineManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA4B58F3919E45878E8F9DE5 /* AudioEngineManager.swift */; };
+3FF7EA0CB30E4E1DA9BC55A4 /* PortaDSPKit in Frameworks */ = {isa = PBXBuildFile; productRef = E5A2B8A12703476BB8E8CA73 /* PortaDSPKit */; };
+1FBDEB5486EF4480846374AB /* PortaDSPKit in Frameworks */ = {isa = PBXBuildFile; productRef = 8CADA939172942E782DB0127 /* PortaDSPKit */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+BECF72BD90F44DFBA12077D6 /* AVEngineDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVEngineDemoApp.swift; sourceTree = "<group>"; };
+794492B83A0B4A869DC00766 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+EA4B58F3919E45878E8F9DE5 /* AudioEngineManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioEngineManager.swift; sourceTree = "<group>"; };
+2EA56E648E294286BDD2A615 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+6C21346367EE4C40842567DF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+B9B42EBC4DF54E2A9E144523 /* AVEngineDemo iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "AVEngineDemo iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+6AE2BE0130AF475A981E651C /* AVEngineDemo macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "AVEngineDemo macOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+F157C02B0CF44DAEAB1AB611 /* Frameworks */ = {
+isa = PBXFrameworksBuildPhase;
+buildActionMask = 2147483647;
+files = (
+3FF7EA0CB30E4E1DA9BC55A4 /* PortaDSPKit in Frameworks */,
+);
+runOnlyForDeploymentPostprocessing = 0;
+};
+B455D4B769FD4658A7780460 /* Frameworks */ = {
+isa = PBXFrameworksBuildPhase;
+buildActionMask = 2147483647;
+files = (
+1FBDEB5486EF4480846374AB /* PortaDSPKit in Frameworks */,
+);
+runOnlyForDeploymentPostprocessing = 0;
+};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+A1C5FD53C1C34947BEF434E3 = {
+isa = PBXGroup;
+children = (
+F571F2AA44414E4786B4CAC0 /* Shared */,
+56E5522605804CA0B582C80D /* iOS */,
+0BAF721807634DDFA1238B63 /* macOS */,
+7B948572263E4E1AA0256DBC /* Products */,
+);
+sourceTree = "<group>";
+};
+F571F2AA44414E4786B4CAC0 /* Shared */ = {
+isa = PBXGroup;
+children = (
+BECF72BD90F44DFBA12077D6 /* AVEngineDemoApp.swift */,
+EA4B58F3919E45878E8F9DE5 /* AudioEngineManager.swift */,
+794492B83A0B4A869DC00766 /* ContentView.swift */,
+);
+path = Shared;
+sourceTree = "<group>";
+};
+56E5522605804CA0B582C80D /* iOS */ = {
+isa = PBXGroup;
+children = (
+2EA56E648E294286BDD2A615 /* Info.plist */,
+);
+path = iOS;
+sourceTree = "<group>";
+};
+0BAF721807634DDFA1238B63 /* macOS */ = {
+isa = PBXGroup;
+children = (
+6C21346367EE4C40842567DF /* Info.plist */,
+);
+path = macOS;
+sourceTree = "<group>";
+};
+7B948572263E4E1AA0256DBC /* Products */ = {
+isa = PBXGroup;
+children = (
+B9B42EBC4DF54E2A9E144523 /* AVEngineDemo iOS.app */,
+6AE2BE0130AF475A981E651C /* AVEngineDemo macOS.app */,
+);
+name = Products;
+sourceTree = "<group>";
+};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+2946FA90C7A143B1A3B6B3D8 /* AVEngineDemo iOS */ = {
+isa = PBXNativeTarget;
+buildConfigurationList = FD76E7EC7AEF4E53AC962493 /* Build configuration list for PBXNativeTarget "AVEngineDemo iOS" */;
+buildPhases = (
+987A5416AB844C6A89B4BD3F /* Sources */,
+F157C02B0CF44DAEAB1AB611 /* Frameworks */,
+1201F821C2504F7FA719DD75 /* Resources */,
+);
+buildRules = (
+);
+dependencies = (
+);
+name = "AVEngineDemo iOS";
+packageProductDependencies = (
+E5A2B8A12703476BB8E8CA73 /* PortaDSPKit */,
+);
+productName = "AVEngineDemo iOS";
+productReference = B9B42EBC4DF54E2A9E144523 /* AVEngineDemo iOS.app */;
+productType = "com.apple.product-type.application";
+};
+D1BD8DDF81AD45C7BEFBBB8B /* AVEngineDemo macOS */ = {
+isa = PBXNativeTarget;
+buildConfigurationList = F869A527419148E78669521E /* Build configuration list for PBXNativeTarget "AVEngineDemo macOS" */;
+buildPhases = (
+4227B78433934EFBBEA8FA15 /* Sources */,
+B455D4B769FD4658A7780460 /* Frameworks */,
+945B92FC18AB4ADC9B671B10 /* Resources */,
+);
+buildRules = (
+);
+dependencies = (
+);
+name = "AVEngineDemo macOS";
+packageProductDependencies = (
+8CADA939172942E782DB0127 /* PortaDSPKit */,
+);
+productName = "AVEngineDemo macOS";
+productReference = 6AE2BE0130AF475A981E651C /* AVEngineDemo macOS.app */;
+productType = "com.apple.product-type.application";
+};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+CCE4DDB2518B412484966F57 /* Project object */ = {
+isa = PBXProject;
+attributes = {
+BuildIndependentTargetsInParallel = 1;
+LastSwiftUpdateCheck = 1500;
+LastUpgradeCheck = 1500;
+TargetAttributes = {
+2946FA90C7A143B1A3B6B3D8 = {
+ProvisioningStyle = Automatic;
+};
+D1BD8DDF81AD45C7BEFBBB8B = {
+ProvisioningStyle = Automatic;
+};
+};
+};
+buildConfigurationList = 2742712E84C245169820F313 /* Build configuration list for PBXProject "AVEngineDemo" */;
+compatibilityVersion = "Xcode 14.0";
+developmentRegion = en;
+hasScannedForEncodings = 0;
+knownRegions = (
+en,
+Base,
+);
+mainGroup = A1C5FD53C1C34947BEF434E3;
+packageReferences = (
+A6671268DEFD4674B5087C95 /* XCLocalSwiftPackageReference "PortaDSPKit" */,
+);
+productRefGroup = 7B948572263E4E1AA0256DBC /* Products */;
+projectDirPath = "";
+projectRoot = "";
+targets = (
+2946FA90C7A143B1A3B6B3D8 /* AVEngineDemo iOS */,
+D1BD8DDF81AD45C7BEFBBB8B /* AVEngineDemo macOS */,
+);
+};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+1201F821C2504F7FA719DD75 /* Resources */ = {
+isa = PBXResourcesBuildPhase;
+buildActionMask = 2147483647;
+files = (
+);
+runOnlyForDeploymentPostprocessing = 0;
+};
+945B92FC18AB4ADC9B671B10 /* Resources */ = {
+isa = PBXResourcesBuildPhase;
+buildActionMask = 2147483647;
+files = (
+);
+runOnlyForDeploymentPostprocessing = 0;
+};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+987A5416AB844C6A89B4BD3F /* Sources */ = {
+isa = PBXSourcesBuildPhase;
+buildActionMask = 2147483647;
+files = (
+4B8B652D08DA45D191459292 /* AVEngineDemoApp.swift in Sources */,
+5592D8A6DE934AF99A703B81 /* AudioEngineManager.swift in Sources */,
+17E7AE4572354CEEA764ADF6 /* ContentView.swift in Sources */,
+);
+runOnlyForDeploymentPostprocessing = 0;
+};
+4227B78433934EFBBEA8FA15 /* Sources */ = {
+isa = PBXSourcesBuildPhase;
+buildActionMask = 2147483647;
+files = (
+ACB09134D26A4CBE9D19E535 /* AVEngineDemoApp.swift in Sources */,
+1CA8E8718A3C4DD3A6ACB8BD /* AudioEngineManager.swift in Sources */,
+A90349F9DC904BE799C4C30A /* ContentView.swift in Sources */,
+);
+runOnlyForDeploymentPostprocessing = 0;
+};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+49D7939E92574F379B095B1B /* Debug */ = {
+isa = XCBuildConfiguration;
+buildSettings = {
+ALWAYS_SEARCH_USER_PATHS = NO;
+CLANG_ANALYZER_NONNULL = YES;
+CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+CLANG_ENABLE_MODULES = YES;
+CLANG_ENABLE_OBJC_ARC = YES;
+CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+CLANG_WARN_BOOL_CONVERSION = YES;
+CLANG_WARN_COMMA = YES;
+CLANG_WARN_CONSTANT_CONVERSION = YES;
+CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+CLANG_WARN_EMPTY_BODY = YES;
+CLANG_WARN_ENUM_CONVERSION = YES;
+CLANG_WARN_INFINITE_RECURSION = YES;
+CLANG_WARN_INT_CONVERSION = YES;
+CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+CLANG_WARN_STRICT_PROTOTYPES = YES;
+CLANG_WARN_SUSPICIOUS_MOVE = YES;
+CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+CODE_SIGN_STYLE = Automatic;
+COPY_PHASE_STRIP = NO;
+DEBUG_INFORMATION_FORMAT = dwarf;
+ENABLE_STRICT_OBJC_MSGSEND = YES;
+ENABLE_TESTABILITY = YES;
+GCC_C_LANGUAGE_STANDARD = gnu11;
+GCC_DYNAMIC_NO_PIC = NO;
+GCC_NO_COMMON_BLOCKS = YES;
+GCC_OPTIMIZATION_LEVEL = 0;
+GCC_PREPROCESSOR_DEFINITIONS = (
+"DEBUG=1",
+"$(inherited)",
+);
+GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+GCC_WARN_UNDECLARED_SELECTOR = YES;
+GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+GCC_WARN_UNUSED_FUNCTION = YES;
+GCC_WARN_UNUSED_VARIABLE = YES;
+MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+SWIFT_VERSION = 5.0;
+};
+name = Debug;
+};
+D9C0FFB7E29643588F79D136 /* Release */ = {
+isa = XCBuildConfiguration;
+buildSettings = {
+ALWAYS_SEARCH_USER_PATHS = NO;
+CLANG_ANALYZER_NONNULL = YES;
+CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+CLANG_ENABLE_MODULES = YES;
+CLANG_ENABLE_OBJC_ARC = YES;
+CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+CLANG_WARN_BOOL_CONVERSION = YES;
+CLANG_WARN_COMMA = YES;
+CLANG_WARN_CONSTANT_CONVERSION = YES;
+CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+CLANG_WARN_EMPTY_BODY = YES;
+CLANG_WARN_ENUM_CONVERSION = YES;
+CLANG_WARN_INFINITE_RECURSION = YES;
+CLANG_WARN_INT_CONVERSION = YES;
+CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+CLANG_WARN_STRICT_PROTOTYPES = YES;
+CLANG_WARN_SUSPICIOUS_MOVE = YES;
+CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+CODE_SIGN_STYLE = Automatic;
+COPY_PHASE_STRIP = NO;
+DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+ENABLE_NS_ASSERTIONS = NO;
+ENABLE_STRICT_OBJC_MSGSEND = YES;
+GCC_C_LANGUAGE_STANDARD = gnu11;
+GCC_NO_COMMON_BLOCKS = YES;
+GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+GCC_WARN_UNDECLARED_SELECTOR = YES;
+GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+GCC_WARN_UNUSED_FUNCTION = YES;
+GCC_WARN_UNUSED_VARIABLE = YES;
+MTL_ENABLE_DEBUG_INFO = NO;
+SWIFT_COMPILATION_MODE = wholemodule;
+SWIFT_OPTIMIZATION_LEVEL = "-O";
+SWIFT_VERSION = 5.0;
+};
+name = Release;
+};
+0456C1CE47FB47F7A2657013 /* Debug */ = {
+isa = XCBuildConfiguration;
+buildSettings = {
+ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+CODE_SIGN_STYLE = Automatic;
+CURRENT_PROJECT_VERSION = 1;
+DEVELOPMENT_TEAM = "";
+GENERATE_INFOPLIST_FILE = NO;
+INFOPLIST_FILE = iOS/Info.plist;
+INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+LD_RUNPATH_SEARCH_PATHS = (
+"$(inherited)",
+"@executable_path/Frameworks",
+);
+MARKETING_VERSION = 1.0;
+PRODUCT_BUNDLE_IDENTIFIER = com.porta.AVEngineDemo.iOS;
+PRODUCT_NAME = "AVEngineDemo iOS";
+SWIFT_EMIT_LOC_STRINGS = NO;
+SWIFT_VERSION = 5.0;
+TARGETED_DEVICE_FAMILY = "1,2";
+};
+name = Debug;
+};
+2288D07040814CA6B6867C2A /* Release */ = {
+isa = XCBuildConfiguration;
+buildSettings = {
+ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+CODE_SIGN_STYLE = Automatic;
+CURRENT_PROJECT_VERSION = 1;
+DEVELOPMENT_TEAM = "";
+GENERATE_INFOPLIST_FILE = NO;
+INFOPLIST_FILE = iOS/Info.plist;
+INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+LD_RUNPATH_SEARCH_PATHS = (
+"$(inherited)",
+"@executable_path/Frameworks",
+);
+MARKETING_VERSION = 1.0;
+PRODUCT_BUNDLE_IDENTIFIER = com.porta.AVEngineDemo.iOS;
+PRODUCT_NAME = "AVEngineDemo iOS";
+SWIFT_EMIT_LOC_STRINGS = NO;
+SWIFT_VERSION = 5.0;
+TARGETED_DEVICE_FAMILY = "1,2";
+};
+name = Release;
+};
+6DAD45CB088D441EB581E586 /* Debug */ = {
+isa = XCBuildConfiguration;
+buildSettings = {
+CODE_SIGN_STYLE = Automatic;
+CURRENT_PROJECT_VERSION = 1;
+DEVELOPMENT_TEAM = "";
+GENERATE_INFOPLIST_FILE = NO;
+INFOPLIST_FILE = macOS/Info.plist;
+LD_RUNPATH_SEARCH_PATHS = (
+"$(inherited)",
+"@executable_path/../Frameworks",
+);
+MACOSX_DEPLOYMENT_TARGET = 13.0;
+MARKETING_VERSION = 1.0;
+PRODUCT_BUNDLE_IDENTIFIER = com.porta.AVEngineDemo.macOS;
+PRODUCT_NAME = "AVEngineDemo macOS";
+SWIFT_EMIT_LOC_STRINGS = NO;
+SWIFT_VERSION = 5.0;
+};
+name = Debug;
+};
+90FC4D590A254BB9B5864FFD /* Release */ = {
+isa = XCBuildConfiguration;
+buildSettings = {
+CODE_SIGN_STYLE = Automatic;
+CURRENT_PROJECT_VERSION = 1;
+DEVELOPMENT_TEAM = "";
+GENERATE_INFOPLIST_FILE = NO;
+INFOPLIST_FILE = macOS/Info.plist;
+LD_RUNPATH_SEARCH_PATHS = (
+"$(inherited)",
+"@executable_path/../Frameworks",
+);
+MACOSX_DEPLOYMENT_TARGET = 13.0;
+MARKETING_VERSION = 1.0;
+PRODUCT_BUNDLE_IDENTIFIER = com.porta.AVEngineDemo.macOS;
+PRODUCT_NAME = "AVEngineDemo macOS";
+SWIFT_EMIT_LOC_STRINGS = NO;
+SWIFT_VERSION = 5.0;
+};
+name = Release;
+};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+2742712E84C245169820F313 /* Build configuration list for PBXProject "AVEngineDemo" */ = {
+isa = XCConfigurationList;
+buildConfigurations = (
+49D7939E92574F379B095B1B /* Debug */,
+D9C0FFB7E29643588F79D136 /* Release */,
+);
+defaultConfigurationIsVisible = 0;
+defaultConfigurationName = Release;
+};
+FD76E7EC7AEF4E53AC962493 /* Build configuration list for PBXNativeTarget "AVEngineDemo iOS" */ = {
+isa = XCConfigurationList;
+buildConfigurations = (
+0456C1CE47FB47F7A2657013 /* Debug */,
+2288D07040814CA6B6867C2A /* Release */,
+);
+defaultConfigurationIsVisible = 0;
+defaultConfigurationName = Release;
+};
+F869A527419148E78669521E /* Build configuration list for PBXNativeTarget "AVEngineDemo macOS" */ = {
+isa = XCConfigurationList;
+buildConfigurations = (
+6DAD45CB088D441EB581E586 /* Debug */,
+90FC4D590A254BB9B5864FFD /* Release */,
+);
+defaultConfigurationIsVisible = 0;
+defaultConfigurationName = Release;
+};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+A6671268DEFD4674B5087C95 /* XCLocalSwiftPackageReference "PortaDSPKit" */ = {
+isa = XCLocalSwiftPackageReference;
+name = PortaDSPKit;
+relativePath = ../../Packages/PortaDSPKit;
+};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+E5A2B8A12703476BB8E8CA73 /* PortaDSPKit */ = {
+isa = XCSwiftPackageProductDependency;
+package = A6671268DEFD4674B5087C95 /* XCLocalSwiftPackageReference "PortaDSPKit" */;
+productName = PortaDSPKit;
+};
+8CADA939172942E782DB0127 /* PortaDSPKit */ = {
+isa = XCSwiftPackageProductDependency;
+package = A6671268DEFD4674B5087C95 /* XCLocalSwiftPackageReference "PortaDSPKit" */;
+productName = PortaDSPKit;
+};
+/* End XCSwiftPackageProductDependency section */
+
+};
+rootObject = CCE4DDB2518B412484966F57 /* Project object */;
+}
