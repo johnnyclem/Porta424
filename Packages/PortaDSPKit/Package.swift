@@ -17,8 +17,10 @@ let package = Package(
             path: "Sources/PortaDSPBridge",
             publicHeadersPath: "include",
             cxxSettings: [
-                .define("PORTA_DSP_BRIDGE"),
-                .unsafeFlags(["-std=c++17"])
+                .define("PORTA_DSP_BRIDGE")
+            ],
+            linkerSettings: [
+                .linkedLibrary("atomic", .when(platforms: [.linux]))
             ]
         ),
         // Swift façade target that UI engineers import

@@ -1,5 +1,6 @@
 
 module PortaDSPBridge [system] {
     header "PortaDSPBridge.h"
+    header "dsp_passthrough.h"
     export *
 }

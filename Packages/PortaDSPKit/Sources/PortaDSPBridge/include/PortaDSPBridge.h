@@ -1,6 +1,7 @@
 
 #pragma once
 #include <stdint.h>
+#include "dsp_passthrough.h"
 
 #ifdef __cplusplus
 extern "C" {
