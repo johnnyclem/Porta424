@@ -4,12 +4,15 @@
 #include <vector>
 #include <cmath>
 #include <cstring>
+#include "../../../../DSPCore/include/modules/head_bump.h"
 
 struct PortaStubContext {
     double fs = 48000.0;
     int maxBlock = 512;
     int tracks = 4;
     std::atomic<porta_params_t> params;
+    porta_params_t currentParams{};
+    HeadBump headBump;
     std::vector<float> rmsAcc;
     std::vector<int> rmsCount;
 };
@@ -21,8 +24,12 @@ porta_dsp_handle porta_create(double sampleRate, int maxBlock, int tracks) {
     ctx->tracks = tracks;
     porta_params_t p{};
     ctx->params.store(p, std::memory_order_relaxed);
+    ctx->currentParams = p;
     ctx->rmsAcc.assign(8, 0.0f);
     ctx->rmsCount.assign(8, 0);
+    int channels = tracks > 0 ? tracks : 1;
+    ctx->headBump.prepare(static_cast<float>(ctx->fs), channels);
+    ctx->headBump.setParams(p.headBumpFreqHz, p.headBumpGainDb);
     return (porta_dsp_handle)ctx;
 }
 
@@ -38,19 +45,27 @@ void porta_update_params(porta_dsp_handle h, const porta_params_t* p) {
 
 void porta_process_interleaved(porta_dsp_handle h, float* inter, int frames, int ch) {
     auto* ctx = (PortaStubContext*)h;
-    (void)ctx;
-    // STUB: pass-through + simple soft-clip to show wiring
-    for (int i=0;i<frames;i++) {
-        for (int c=0;c<ch;c++) {
-            float* s = &inter[i*ch + c];
+    if (ctx == nullptr || inter == nullptr || frames <= 0 || ch <= 0) {
+        return;
+    }
+
+    porta_params_t params = ctx->params.load(std::memory_order_acquire);
+    if (ctx->headBump.channelCount() != ch) {
+        ctx->headBump.prepare(static_cast<float>(ctx->fs), ch);
+    }
+    ctx->headBump.setParams(params.headBumpFreqHz, params.headBumpGainDb);
+    ctx->currentParams = params;
+
+    for (int i = 0; i < frames; ++i) {
+        for (int c = 0; c < ch; ++c) {
+            float* s = &inter[i * ch + c];
             float x = *s;
-            // tiny soft knee
-            float y = std::tanh(x);
+            float filtered = ctx->headBump.processSample(x, c);
+            float y = std::tanh(filtered);
             *s = y;
-            // meter (very rough RMS accumulator)
             int idx = c;
             if (idx < (int)ctx->rmsAcc.size()) {
-                ctx->rmsAcc[idx] += y*y;
+                ctx->rmsAcc[idx] += y * y;
                 ctx->rmsCount[idx] += 1;
             }
         }
