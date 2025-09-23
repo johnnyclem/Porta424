@@ -40,7 +40,7 @@ final class AudioEngineManager: ObservableObject {
     private var meterTimer: Timer?
     #endif
 
-    private static let meterFloor: Float = -120.0
+    static let meterFloor: Float = -120.0
     private static let smoothingFactor: Float = 0.25
 
     init(presetStore: PortaPresetStore = PortaPresetStore()) {
