@@ -12,10 +12,18 @@ final class AudioEngineManager: ObservableObject {
     }
 
     @Published private(set) var state: State = .idle
+    @Published var hissLevelDbFS: Float = PortaDSP.Params().hissLevelDbFS {
+        didSet {
+            pendingParams.hissLevelDbFS = hissLevelDbFS
+            guard let dspUnit else { return }
+            updateHissParameter(on: dspUnit)
+        }
+    }
 
     private let engine = AVAudioEngine()
     private var dspUnit: PortaDSPAudioUnit?
     private var avUnit: AVAudioUnit?
+    private var pendingParams = PortaDSP.Params()
 
     var statusText: String {
         switch state {
@@ -86,6 +94,7 @@ final class AudioEngineManager: ObservableObject {
         let (node, dsp) = try await installDSPNode()
         avUnit = node
         dspUnit = dsp
+        applyPendingParametersToDSP()
         let format = engine.inputNode.inputFormat(forBus: 0)
         engine.connect(engine.inputNode, to: node, format: format)
         engine.connect(node, to: engine.mainMixerNode, format: format)
@@ -127,4 +136,28 @@ final class AudioEngineManager: ObservableObject {
         }
     }
     #endif
+
+    private func applyPendingParametersToDSP() {
+        guard let dspUnit else { return }
+        dspUnit.updateParameters(pendingParams)
+        logHissRoundTrip(on: dspUnit)
+    }
+
+    private func updateHissParameter(on dsp: PortaDSPAudioUnit) {
+        dsp.parameterTree?
+            .parameter(withAddress: PortaDSPAudioUnit.ParameterID.hissLevelDbFS.address)?
+            .setValue(hissLevelDbFS, originator: nil)
+        logHissRoundTrip(on: dsp)
+    }
+
+    private func logHissRoundTrip(on dsp: PortaDSPAudioUnit) {
+        let snapshot = dsp.currentParameters()
+        print(
+            String(
+                format: "[PortaDSPAudioUnit] hissLevelDbFS set to %.1f dBFS (cached %.1f dBFS)",
+                hissLevelDbFS,
+                snapshot.hissLevelDbFS
+            )
+        )
+    }
 }
