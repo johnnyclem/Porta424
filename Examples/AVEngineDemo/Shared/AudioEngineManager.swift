@@ -19,6 +19,24 @@ final class AudioEngineManager: ObservableObject {
     @Published private(set) var currentPresetName: String
     @Published private(set) var userPresets: [PortaPreset]
     @Published private(set) var meters: [Float] = Array(repeating: AudioEngineManager.meterFloor, count: 2)
+    @Published var satDriveDb: Float = -6.0 {
+        didSet {
+            currentParams.satDriveDb = satDriveDb
+            applyParameters()
+        }
+    }
+    @Published var headBumpGainDb: Float = 2.0 {
+        didSet {
+            currentParams.headBumpGainDb = headBumpGainDb
+            applyParameters()
+        }
+    }
+    @Published var wowDepth: Float = 0.0006 {
+        didSet {
+            currentParams.wowDepth = wowDepth
+            applyParameters()
+        }
+    }
 
     let factoryPresets = PortaPreset.factoryPresets
 
@@ -34,6 +52,7 @@ final class AudioEngineManager: ObservableObject {
     // Metering state
     private var channelCount = 0
     private var smoothedMeters: [Float] = Array(repeating: AudioEngineManager.meterFloor, count: 2)
+    private var currentParams = PortaDSP.Params()
     #if os(iOS)
     private var displayLink: CADisplayLink?
     #else
@@ -159,6 +178,9 @@ final class AudioEngineManager: ObservableObject {
         let (node, dsp) = try await installDSPNode()
         avUnit = node
         dspUnit = dsp
+        currentParams.satDriveDb = satDriveDb
+        currentParams.headBumpGainDb = headBumpGainDb
+        currentParams.wowDepth = wowDepth
         applyParametersToDSP()
         let format = engine.inputNode.inputFormat(forBus: 0)
         channelCount = Int(format.channelCount)
@@ -169,6 +191,7 @@ final class AudioEngineManager: ObservableObject {
         engine.prepare()
         try engine.start()
         state = .running
+        applyParameters()
         startMeterUpdates()
     }
 
@@ -277,5 +300,10 @@ final class AudioEngineManager: ObservableObject {
             meters = Array(repeating: Self.meterFloor, count: meters.count)
         }
         smoothedMeters = meters
+    }
+
+    private func applyParameters() {
+        guard let dspUnit else { return }
+        dspUnit.updateParameters(currentParams)
     }
 }

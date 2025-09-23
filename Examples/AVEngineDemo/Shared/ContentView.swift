@@ -17,6 +17,53 @@ struct ContentView: View {
 
             MeterStack(levels: engineManager.meters)
 
+            VStack(spacing: 16) {
+                ParameterSlider(
+                    title: "Drive",
+                    valueLabel: "\(engineManager.satDriveDb, specifier: "%.1f") dB",
+                    slider: {
+                        Slider(
+                            value: Binding(
+                                get: { Double(engineManager.satDriveDb) },
+                                set: { engineManager.satDriveDb = Float($0) }
+                            ),
+                            in: -24...12,
+                            step: 0.5
+                        )
+                    }
+                )
+
+                ParameterSlider(
+                    title: "Head Bump Gain",
+                    valueLabel: "\(engineManager.headBumpGainDb, specifier: "%.1f") dB",
+                    slider: {
+                        Slider(
+                            value: Binding(
+                                get: { Double(engineManager.headBumpGainDb) },
+                                set: { engineManager.headBumpGainDb = Float($0) }
+                            ),
+                            in: -6...12,
+                            step: 0.5
+                        )
+                    }
+                )
+
+                ParameterSlider(
+                    title: "Wow Depth",
+                    valueLabel: "\(engineManager.wowDepth, specifier: "%.4f")",
+                    slider: {
+                        Slider(
+                            value: Binding(
+                                get: { Double(engineManager.wowDepth) },
+                                set: { engineManager.wowDepth = Float($0) }
+                            ),
+                            in: 0...0.002,
+                            step: 0.0001
+                        )
+                    }
+                )
+            }
+
             Button(engineManager.isRunning ? "Stop" : "Start") {
                 if engineManager.isRunning {
                     engineManager.stop()
@@ -118,6 +165,26 @@ private struct MeterStack: View {
             .frame(maxWidth: .infinity)
             .animation(.easeOut(duration: 0.08), value: levels)
             .accessibilityElement(children: .contain)
+        }
+    }
+}
+
+private struct ParameterSlider<SliderContent: View>: View {
+    let title: String
+    let valueLabel: String
+    @ViewBuilder var slider: () -> SliderContent
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(title)
+                Spacer()
+                Text(valueLabel)
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            slider()
         }
     }
 }
