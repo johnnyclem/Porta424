@@ -1,3 +1,4 @@
+#if canImport(AudioToolbox)
 import AudioToolbox
 import AVFoundation
 import Foundation
@@ -266,3 +267,68 @@ public enum PortaDSPNodeFactory {
         return resolvedUnit
     }
 }
+#else
+import Foundation
+
+public enum PortaDSPAudioUnitError: Error {
+    case unsupportedPlatform
+}
+
+public struct AudioComponentDescription: Sendable {
+    public var componentType: UInt32
+    public var componentSubType: UInt32
+    public var componentManufacturer: UInt32
+    public var componentFlags: UInt32
+    public var componentFlagsMask: UInt32
+
+    public init(
+        componentType: UInt32 = 0,
+        componentSubType: UInt32 = 0,
+        componentManufacturer: UInt32 = 0,
+        componentFlags: UInt32 = 0,
+        componentFlagsMask: UInt32 = 0
+    ) {
+        self.componentType = componentType
+        self.componentSubType = componentSubType
+        self.componentManufacturer = componentManufacturer
+        self.componentFlags = componentFlags
+        self.componentFlagsMask = componentFlagsMask
+    }
+}
+
+public struct AudioComponentInstantiationOptions: OptionSet, Sendable {
+    public let rawValue: UInt
+
+    public init(rawValue: UInt) {
+        self.rawValue = rawValue
+    }
+}
+
+public class AVAudioUnit {}
+
+public final class PortaDSPAudioUnit {
+    public static let componentDescription = AudioComponentDescription()
+
+    public init(
+        componentDescription: AudioComponentDescription = PortaDSPAudioUnit.componentDescription,
+        options: AudioComponentInstantiationOptions = []
+    ) throws {
+        throw PortaDSPAudioUnitError.unsupportedPlatform
+    }
+
+    public static func register() {}
+}
+
+public enum PortaDSPNodeFactory {
+    public static func instantiate(
+        options: AudioComponentInstantiationOptions = [],
+        completionHandler: @escaping (AVAudioUnit?, Error?) -> Void
+    ) {
+        completionHandler(nil, PortaDSPAudioUnitError.unsupportedPlatform)
+    }
+
+    public static func instantiateSync(options: AudioComponentInstantiationOptions = []) throws -> AVAudioUnit {
+        throw PortaDSPAudioUnitError.unsupportedPlatform
+    }
+}
+#endif

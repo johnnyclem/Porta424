@@ -1,4 +1,5 @@
 import Foundation
+import PortaDSPBridge
 
 extension PortaDSP.Params {
     /// Converts the Swift parameter container into the C bridge struct expected by the DSP core.

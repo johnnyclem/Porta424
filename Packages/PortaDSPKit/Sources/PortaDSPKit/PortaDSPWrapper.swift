@@ -1,6 +1,8 @@
-
+#if canImport(AVFoundation)
 import AVFoundation
+#endif
 import Foundation
+import PortaDSPBridge
 
 public final class PortaDSP {
     private var handle: porta_dsp_handle?
