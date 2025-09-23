@@ -1,6 +1,7 @@
 #include "PortaDSPBridge.h"
-#include <atomic>
+#include "dsp_context.h"
 #include <algorithm>
+#include <atomic>
 #include <array>
 #include <cmath>
 #include <cstring>
@@ -81,6 +82,7 @@ struct PortaStubContext {
     HeadBump headBump;
     std::vector<float> rmsAcc;
     std::vector<int> rmsCount;
+    DSPContext dsp;
     float driveLinState = 1.0f;
     float trimState = 1.0f;
 };
@@ -92,6 +94,7 @@ porta_dsp_handle porta_create(double sampleRate, int maxBlock, int tracks) {
     ctx->tracks = tracks;
     porta_params_t p{};
     ctx->params.store(p, std::memory_order_relaxed);
+    ctx->dsp.prepare(sampleRate, tracks);
     ctx->currentParams = p;
     ctx->driveLinState = 1.0f;
     ctx->trimState = lookupTrim(0.0f);
@@ -121,13 +124,21 @@ void porta_process_interleaved(porta_dsp_handle h, float* inter, int frames, int
 
     // Load latest params and (re)configure modules if needed.
     porta_params_t p = ctx->params.load(std::memory_order_acquire);
+
+    // Prepare head-bump if channel count has changed; update its params.
     if (ctx->headBump.channelCount() != ch) {
         ctx->headBump.prepare(static_cast<float>(ctx->fs), ch);
     }
     ctx->headBump.setParams(p.headBumpFreqHz, p.headBumpGainDb);
     ctx->currentParams = p;
 
-    // Saturation drive/trim smoothing across the block.
+    // Run dropout/NR/compander stage (DSPContext) first on the raw buffer.
+    DSPContext::Parameters dspParams;
+    dspParams.dropoutRatePerMin = p.dropoutRatePerMin;
+    dspParams.nrTrack4Bypass    = p.nrTrack4Bypass != 0;
+    ctx->dsp.process(inter, frames, ch, dspParams);
+
+    // Then apply head-bump EQ followed by saturation with drive + trim smoothing.
     float targetDriveDb  = p.satDriveDb;
     float targetDriveLin = std::max(dbToLinear(targetDriveDb), 1e-6f);
     float targetTrim     = lookupTrim(targetDriveDb);
@@ -148,14 +159,12 @@ void porta_process_interleaved(porta_dsp_handle h, float* inter, int frames, int
             float* s = &inter[i * totalChannels + c];
             float x = *s;
 
-            // Head bump EQ first, then saturation with drive + trim.
             float hb = ctx->headBump.processSample(x, c);
             float shaped = std::tanh(drive * hb);
             float y = shaped * trim;
 
             *s = y;
 
-            // Rough per-channel RMS metering.
             if (c < static_cast<int>(ctx->rmsAcc.size())) {
                 ctx->rmsAcc[c]   += y * y;
                 ctx->rmsCount[c] += 1;
