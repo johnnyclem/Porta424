@@ -36,6 +36,22 @@ struct PortaStubContext {
     Meters meters;
 };
 
+static porta_params_t makeDefaultParams() {
+    porta_params_t p{};
+    p.wowDepth = 0.0006f;
+    p.flutterDepth = 0.0003f;
+    p.headBumpGainDb = 2.0f;
+    p.headBumpFreqHz = 80.0f;
+    p.satDriveDb = -6.0f;
+    p.hissLevelDbFS = -60.0f;
+    p.lpfCutoffHz = 12000.0f;
+    p.azimuthJitterMs = 0.2f;
+    p.crosstalkDb = -60.0f;
+    p.dropoutRatePerMin = 0.2f;
+    p.nrTrack4Bypass = 0;
+    return p;
+}
+
 static void updateModuleParameters(PortaStubContext* ctx, const porta_params_t& p) {
     ctx->saturation.setDriveDb(p.satDriveDb);
     ctx->headBump.setGainDb(p.headBumpGainDb);
@@ -53,7 +69,7 @@ porta_dsp_handle porta_create(double sampleRate, int maxBlock, int tracks) {
     ctx->fs = sampleRate;
     ctx->maxBlock = maxBlock;
     ctx->tracks = tracks;
-    porta_params_t p{};
+    porta_params_t p = makeDefaultParams();
     ctx->params.store(p, std::memory_order_relaxed);
 
     ctx->saturation.prepare(static_cast<float>(sampleRate), maxBlock);
@@ -68,6 +84,8 @@ porta_dsp_handle porta_create(double sampleRate, int maxBlock, int tracks) {
     ctx->eq.prepare(static_cast<float>(sampleRate), maxBlock);
     ctx->meters.prepare(static_cast<float>(sampleRate), maxBlock);
     ctx->meters.clear();
+
+    updateModuleParameters(ctx, p);
 
     return (porta_dsp_handle)ctx;
 }
