@@ -13,6 +13,10 @@ public:
         updateCoefficients();
     }
 
+    void reset() override {
+        envelope = 1.0e-6f;
+    }
+
     void setThresholdDb(float db) {
         thresholdDb = db;
     }
@@ -77,8 +81,5 @@ private:
         releaseCoef = std::exp(-1.0f / ((releaseMs / 1000.0f) * std::max(fs, 1.0f)));
     }
 
-    void reset() {
-        envelope = 1.0e-6f;
-    }
 };
 

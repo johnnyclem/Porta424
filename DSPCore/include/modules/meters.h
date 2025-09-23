@@ -10,13 +10,12 @@ public:
     void prepare(float sampleRate, int maxBlockSize) override {
         (void)sampleRate;
         (void)maxBlockSize;
-        reset(2);
+        currentChannels = 2;
+        resetChannels(currentChannels);
     }
 
-    void reset(int channels) {
-        rmsAcc.assign(channels, 0.0f);
-        peak.assign(channels, 0.0f);
-        sampleCount = 0;
+    void reset() override {
+        resetChannels(currentChannels);
     }
 
     void clear() {
@@ -31,7 +30,8 @@ public:
         }
 
         if ((int)rmsAcc.size() != numChannels) {
-            reset(numChannels);
+            currentChannels = numChannels;
+            resetChannels(currentChannels);
         }
 
         for (int i = 0; i < numFrames; ++i) {
@@ -68,6 +68,14 @@ private:
     std::vector<float> rmsAcc;
     std::vector<float> peak;
     int sampleCount{0};
+    int currentChannels{2};
+
+    void resetChannels(int channels) {
+        int clamped = std::max(1, channels);
+        rmsAcc.assign(clamped, 0.0f);
+        peak.assign(clamped, 0.0f);
+        sampleCount = 0;
+    }
 
     static float linearToDb(float value) {
         return value > 1.0e-9f ? 20.0f * std::log10(value) : -120.0f;

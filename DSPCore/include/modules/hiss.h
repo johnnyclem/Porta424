@@ -18,6 +18,10 @@ public:
         updateLevel();
     }
 
+    void reset() override {
+        rng.seed(12345u);
+    }
+
     void processBlock(float* interleavedBuffer, int numFrames, int numChannels) override {
         if (!interleavedBuffer || numFrames <= 0 || numChannels <= 0) {
             return;

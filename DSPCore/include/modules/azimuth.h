@@ -22,6 +22,10 @@ public:
         updateMatrix();
     }
 
+    void reset() override {
+        updateMatrix();
+    }
+
     void processBlock(float* interleavedBuffer, int numFrames, int numChannels) override {
         if (!interleavedBuffer || numFrames <= 0 || numChannels < 2) {
             return;

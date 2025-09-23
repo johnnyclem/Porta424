@@ -24,6 +24,10 @@ public:
         mix = std::clamp(m, 0.0f, 1.0f);
     }
 
+    void reset() override {
+        std::fill(states.begin(), states.end(), 0.0f);
+    }
+
     void processBlock(float* interleavedBuffer, int numFrames, int numChannels) override {
         if (!interleavedBuffer || numFrames <= 0 || numChannels <= 0) {
             return;

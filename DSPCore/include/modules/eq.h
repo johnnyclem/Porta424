@@ -10,7 +10,11 @@ public:
     void prepare(float sampleRate, int maxBlockSize) override {
         (void)maxBlockSize;
         fs = sampleRate;
-        resizeStates(2);
+        resetChannels(2);
+    }
+
+    void reset() override {
+        resetChannels(currentChannels);
     }
 
     void setLowGainDb(float db) {
@@ -67,17 +71,19 @@ private:
     std::vector<Biquad> lowShelfStates;
     std::vector<Biquad> peakStates;
     std::vector<Biquad> highShelfStates;
+    int currentChannels{2};
 
     void ensureStateSize(int channels) {
-        if (channels > static_cast<int>(lowShelfStates.size())) {
-            resizeStates(channels);
+        if (channels > currentChannels) {
+            resetChannels(channels);
         }
     }
 
-    void resizeStates(int channels) {
-        lowShelfStates.assign(channels, Biquad{});
-        peakStates.assign(channels, Biquad{});
-        highShelfStates.assign(channels, Biquad{});
+    void resetChannels(int channels) {
+        currentChannels = std::max(1, channels);
+        lowShelfStates.assign(currentChannels, Biquad{});
+        peakStates.assign(currentChannels, Biquad{});
+        highShelfStates.assign(currentChannels, Biquad{});
         updateCoefficients();
     }
 

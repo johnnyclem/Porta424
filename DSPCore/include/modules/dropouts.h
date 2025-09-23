@@ -22,6 +22,11 @@ public:
         updateProbability();
     }
 
+    void reset() override {
+        remainingDropoutSamples = 0;
+        rng.seed(5489u);
+    }
+
     void processBlock(float* interleavedBuffer, int numFrames, int numChannels) override {
         if (!interleavedBuffer || numFrames <= 0 || numChannels <= 0) {
             return;

@@ -31,6 +31,10 @@ public:
         updateIncrements();
     }
 
+    void reset() override {
+        resetPhase();
+    }
+
     void processBlock(float* interleavedBuffer, int numFrames, int numChannels) override {
         if (!interleavedBuffer || numFrames <= 0 || numChannels <= 0) {
             return;
