@@ -48,4 +48,24 @@ public final class PortaDSP {
         }
         return out
     }
+
+    // MARK: - Standalone helpers
+
+    public static func passthrough(input: [Float], frames: Int, channels: Int) -> [Float] {
+        let sampleCount = frames * channels
+        guard sampleCount > 0 else { return [] }
+
+        var output = [Float](repeating: 0, count: sampleCount)
+        guard input.count >= sampleCount else { return output }
+
+        input.withUnsafeBufferPointer { inBuffer in
+            guard let inPtr = inBuffer.baseAddress else { return }
+            output.withUnsafeMutableBufferPointer { outBuffer in
+                guard let outPtr = outBuffer.baseAddress else { return }
+                porta_dsp_passthrough(inPtr, outPtr, Int32(frames), Int32(channels))
+            }
+        }
+
+        return output
+    }
 }
