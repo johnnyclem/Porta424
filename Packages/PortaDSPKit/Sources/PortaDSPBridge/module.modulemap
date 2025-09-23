@@ -1,0 +1,5 @@
+
+module PortaDSPBridge [system] {
+    header "PortaDSPBridge.h"
+    export *
+}
