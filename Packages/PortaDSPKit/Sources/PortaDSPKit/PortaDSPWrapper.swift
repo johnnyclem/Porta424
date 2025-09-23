@@ -7,7 +7,7 @@ import PortaDSPBridge
 public final class PortaDSP {
     private var handle: porta_dsp_handle?
 
-    public struct Params: Sendable {
+    public struct Params: Sendable, Codable {
         public var wowDepth: Float = 0.0006
         public var flutterDepth: Float = 0.0003
         public var headBumpGainDb: Float = 2.0

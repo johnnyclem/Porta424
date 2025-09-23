@@ -1,3 +1,4 @@
+import PortaDSPKit
 import SwiftUI
 
 struct ContentView: View {
@@ -15,6 +16,8 @@ struct ContentView: View {
 
             MeterStack(levels: engineManager.meters)
 
+            ParameterControls(params: $engineManager.params)
+
             Button(engineManager.isRunning ? "Stop" : "Start") {
                 if engineManager.isRunning {
                     engineManager.stop()
@@ -26,6 +29,57 @@ struct ContentView: View {
         }
         .padding()
         .frame(maxWidth: 400)
+    }
+}
+
+private struct ParameterControls: View {
+    @Binding var params: PortaDSP.Params
+
+    var body: some View {
+        GroupBox("Preset") {
+            VStack(alignment: .leading, spacing: 16) {
+                FloatParameterSlider(
+                    title: "Wow Depth",
+                    value: $params.wowDepth,
+                    range: 0.0...0.003,
+                    format: "%.4f"
+                )
+                FloatParameterSlider(
+                    title: "Saturation Drive (dB)",
+                    value: $params.satDriveDb,
+                    range: -24.0...12.0,
+                    format: "%.1f"
+                )
+                Toggle("Bypass NR Track 4", isOn: $params.nrTrack4Bypass)
+            }
+            .padding(.vertical, 4)
+        }
+    }
+}
+
+private struct FloatParameterSlider: View {
+    let title: String
+    @Binding var value: Float
+    let range: ClosedRange<Double>
+    let format: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(title)
+                Spacer()
+                Text(String(format: format, Double(value)))
+                    .font(.system(.body, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+            Slider(
+                value: Binding(
+                    get: { Double(value) },
+                    set: { value = Float($0) }
+                ),
+                in: range
+            )
+        }
     }
 }
 
