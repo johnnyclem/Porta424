@@ -2,6 +2,9 @@ import AVFoundation
 import Foundation
 import PortaDSPKit
 import SwiftUI
+#if os(iOS)
+import QuartzCore
+#endif
 
 @MainActor
 final class AudioEngineManager: ObservableObject {
@@ -15,20 +18,35 @@ final class AudioEngineManager: ObservableObject {
     @Published private(set) var state: State = .idle
     @Published private(set) var currentPresetName: String
     @Published private(set) var userPresets: [PortaPreset]
+    @Published private(set) var meters: [Float] = Array(repeating: AudioEngineManager.meterFloor, count: 2)
 
     let factoryPresets = PortaPreset.factoryPresets
 
     private let engine = AVAudioEngine()
     private var dspUnit: PortaDSPAudioUnit?
     private var avUnit: AVAudioUnit?
+
+    // Preset management
     private let presetStore: PortaPresetStore
     private var selectedFactoryPresetIndex: Int?
     private var currentParams = PortaDSP.Params()
 
+    // Metering state
+    private var channelCount = 0
+    private var smoothedMeters: [Float] = Array(repeating: AudioEngineManager.meterFloor, count: 2)
+    #if os(iOS)
+    private var displayLink: CADisplayLink?
+    #else
+    private var meterTimer: Timer?
+    #endif
+
+    private static let meterFloor: Float = -120.0
+    private static let smoothingFactor: Float = 0.25
+
     init(presetStore: PortaPresetStore = PortaPresetStore()) {
         self.presetStore = presetStore
-        userPresets = presetStore.loadPresets()
-        currentPresetName = "Default"
+        self.userPresets = presetStore.loadPresets()
+        self.currentPresetName = "Default"
     }
 
     var statusText: String {
@@ -48,6 +66,8 @@ final class AudioEngineManager: ObservableObject {
         if case .running = state { return true }
         return false
     }
+
+    // MARK: - Presets
 
     func applyFactoryPreset(at index: Int) {
         guard factoryPresets.indices.contains(index) else { return }
@@ -82,6 +102,8 @@ final class AudioEngineManager: ObservableObject {
     func reloadUserPresets() {
         userPresets = presetStore.loadPresets()
     }
+
+    // MARK: - Engine lifecycle
 
     func start() {
         guard state != .starting else { return }
@@ -124,6 +146,9 @@ final class AudioEngineManager: ObservableObject {
         }
         avUnit = nil
         dspUnit = nil
+        stopMeterUpdates()
+        channelCount = 0
+        resetMeters()
         state = .idle
         #if os(iOS)
         try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
@@ -136,12 +161,15 @@ final class AudioEngineManager: ObservableObject {
         dspUnit = dsp
         applyParametersToDSP()
         let format = engine.inputNode.inputFormat(forBus: 0)
+        channelCount = Int(format.channelCount)
+        prepareMeterBuffers()
         engine.connect(engine.inputNode, to: node, format: format)
         engine.connect(node, to: engine.mainMixerNode, format: format)
         engine.connect(engine.mainMixerNode, to: engine.outputNode, format: nil)
         engine.prepare()
         try engine.start()
         state = .running
+        startMeterUpdates()
     }
 
     private func installDSPNode() async throws -> (AVAudioUnit, PortaDSPAudioUnit) {
@@ -184,5 +212,70 @@ final class AudioEngineManager: ObservableObject {
         } else {
             dspUnit.updateParameters(currentParams)
         }
+    }
+
+    // MARK: - Metering
+
+    private func startMeterUpdates() {
+        stopMeterUpdates()
+        pollMeters()
+        #if os(iOS)
+        let link = CADisplayLink(target: self, selector: #selector(handleDisplayLink(_:)))
+        link.add(to: .main, forMode: .common)
+        displayLink = link
+        #else
+        meterTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+            self?.pollMeters()
+        }
+        #endif
+    }
+
+    private func stopMeterUpdates() {
+        #if os(iOS)
+        displayLink?.invalidate()
+        displayLink = nil
+        #else
+        meterTimer?.invalidate()
+        meterTimer = nil
+        #endif
+    }
+
+    @objc
+    private func handleDisplayLink(_ link: CADisplayLink) {
+        pollMeters()
+    }
+
+    private func pollMeters() {
+        guard state == .running, let dspUnit else { return }
+        let rawMeters = dspUnit.readMeters()
+        let channels = max(channelCount, 1)
+        if meters.count != channels { meters = Array(repeating: Self.meterFloor, count: channels) }
+        if smoothedMeters.count != channels { smoothedMeters = Array(repeating: Self.meterFloor, count: channels) }
+        let limit = min(channels, rawMeters.count)
+        var updated = smoothedMeters
+        for index in 0..<limit {
+            let clamped = max(Self.meterFloor, min(0, rawMeters[index]))
+            let previous = smoothedMeters[index]
+            let smoothed = previous + Self.smoothingFactor * (clamped - previous)
+            updated[index] = smoothed
+        }
+        for index in limit..<channels {
+            updated[index] = Self.meterFloor
+        }
+        smoothedMeters = updated
+        meters = updated
+    }
+
+    private func prepareMeterBuffers() {
+        let channels = max(channelCount, 1)
+        meters = Array(repeating: Self.meterFloor, count: channels)
+        smoothedMeters = meters
+    }
+
+    private func resetMeters() {
+        if !meters.isEmpty {
+            meters = Array(repeating: Self.meterFloor, count: meters.count)
+        }
+        smoothedMeters = meters
     }
 }

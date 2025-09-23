@@ -43,3 +43,7 @@ During each render callback the `internalRenderBlock` performs the following seq
 4. If the unit is not bypassed, write the processed samples back to the outgoing `AudioBufferList` in either interleaved or planar form.
 
 The helper methods (`copyInterleavedBuffer`, `copyPlanarBuffer`, `writeInterleavedBuffer`, and `writePlanarBuffer`) isolate format handling and zero-filling logic. Should the platform not support AudioToolbox (such as Linux), the entire Audio Unit surface is replaced with lightweight stubs that throw `unsupportedPlatform`, signalling to host code that only the pure Swift `PortaDSP` API is currently available.
+
+## Meter semantics
+
+`porta_get_meters_dbfs` exposes per-channel RMS levels expressed in dBFS. The DSP core accumulates squared samples during each render callback and converts the running RMS to decibels the next time the getter is called. Importantly, **the accumulators reset on every call**, so a client that wants continuous metering must poll regularly (for example via a display link or timer) and treat each response as the level for the preceding render interval. Channels that have received no samples since the last poll report the floor value of roughly −120 dBFS.
