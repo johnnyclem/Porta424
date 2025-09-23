@@ -15,4 +15,4 @@ A minimal SwiftUI sample that demonstrates how to insert the PortaDSP audio unit
 3. Build and run on a device or simulator with microphone access.
 4. Grant microphone permission when prompted, then tap/click **Start** to begin routing audio.
 
-The PortaDSP unit is instantiated through the new `PortaDSPAudioUnit.makeEngineNode` helper and inserted between the input node and main mixer. With the default passthrough DSP the signal is left unmodified.
+The PortaDSP unit is instantiated through the new `PortaDSPAudioUnit.makeEngineNode` helper and inserted between the input node and main mixer. Use the factory preset picker in the UI to audition the bundled tape profiles; parameter changes are applied instantly while audio is running.

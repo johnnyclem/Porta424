@@ -49,6 +49,23 @@ PortaDSPAudioUnit.makeEngineNode(engine: engine) { unit, audioUnit, error in
 
 The snippet wires the Porta DSP node between the input and output mix. Customize the `Params` struct before calling `update(_:)` to shape the tape processing.
 
+## Factory presets
+
+For quick starting points, PortaDSPKit bundles five curated presets exposed through `PortaDSPPreset.factoryPresets`:
+
+- **Clean Cassette** – gentle modulation and reduced noise for subtle coloration.
+- **Warm Bump** – emphasises the head bump and saturation for a low-end lift.
+- **Lo-Fi Warble** – exaggerated wow/flutter with higher hiss for nostalgic textures.
+- **Crunchy Saturation** – restrained modulation with forward, harmonically rich mids.
+- **Dusty Archive** – narrow bandwidth and audible noise reminiscent of an aged tape.
+
+Apply a preset by passing its parameters into either `PortaDSP` or `PortaDSPAudioUnit`:
+
+```swift
+let preset = PortaDSPPreset.warmBump
+porta.update(preset.parameters)
+```
+
 ## Running the AVEngine demo
 
 The repository contains a simple sample app that boots an `AVAudioEngine` session with Porta inserted:

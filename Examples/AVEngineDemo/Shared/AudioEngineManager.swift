@@ -16,6 +16,10 @@ final class AudioEngineManager: ObservableObject {
 
     @Published private(set) var state: State = .idle
     @Published private(set) var meters: [Float] = Array(repeating: AudioEngineManager.meterFloor, count: 2)
+    @Published private(set) var presets: [PortaDSPPreset]
+    @Published var selectedPreset: PortaDSPPreset {
+        didSet { applySelectedPreset() }
+    }
 
     private let engine = AVAudioEngine()
     private var dspUnit: PortaDSPAudioUnit?
@@ -30,6 +34,13 @@ final class AudioEngineManager: ObservableObject {
 
     private static let meterFloor: Float = -120.0
     private static let smoothingFactor: Float = 0.25
+
+    init(presets: [PortaDSPPreset] = PortaDSPPreset.factoryPresets) {
+        let availablePresets = presets.isEmpty ? [PortaDSPPreset.cleanCassette] : presets
+        self.presets = availablePresets
+        self.selectedPreset = availablePresets.first ?? PortaDSPPreset.cleanCassette
+        applySelectedPreset()
+    }
 
     var statusText: String {
         switch state {
@@ -103,6 +114,7 @@ final class AudioEngineManager: ObservableObject {
         let (node, dsp) = try await installDSPNode()
         avUnit = node
         dspUnit = dsp
+        applySelectedPreset()
         let format = engine.inputNode.inputFormat(forBus: 0)
         channelCount = Int(format.channelCount)
         prepareMeterBuffers()
@@ -209,5 +221,10 @@ final class AudioEngineManager: ObservableObject {
             meters = Array(repeating: Self.meterFloor, count: meters.count)
         }
         smoothedMeters = meters
+    }
+
+    private func applySelectedPreset() {
+        let params = selectedPreset.parameters
+        dspUnit?.updateParameters(params)
     }
 }
