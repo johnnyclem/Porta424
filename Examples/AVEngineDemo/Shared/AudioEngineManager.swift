@@ -1,4 +1,5 @@
 import AVFoundation
+import Foundation
 import PortaDSPKit
 import SwiftUI
 
@@ -12,10 +13,23 @@ final class AudioEngineManager: ObservableObject {
     }
 
     @Published private(set) var state: State = .idle
+    @Published private(set) var currentPresetName: String
+    @Published private(set) var userPresets: [PortaPreset]
+
+    let factoryPresets = PortaPreset.factoryPresets
 
     private let engine = AVAudioEngine()
     private var dspUnit: PortaDSPAudioUnit?
     private var avUnit: AVAudioUnit?
+    private let presetStore: PortaPresetStore
+    private var selectedFactoryPresetIndex: Int?
+    private var currentParams = PortaDSP.Params()
+
+    init(presetStore: PortaPresetStore = PortaPresetStore()) {
+        self.presetStore = presetStore
+        userPresets = presetStore.loadPresets()
+        currentPresetName = "Default"
+    }
 
     var statusText: String {
         switch state {
@@ -33,6 +47,40 @@ final class AudioEngineManager: ObservableObject {
     var isRunning: Bool {
         if case .running = state { return true }
         return false
+    }
+
+    func applyFactoryPreset(at index: Int) {
+        guard factoryPresets.indices.contains(index) else { return }
+        selectedFactoryPresetIndex = index
+        let preset = factoryPresets[index]
+        currentParams = preset.parameters
+        currentPresetName = preset.name
+        applyParametersToDSP()
+    }
+
+    func applyUserPreset(_ preset: PortaPreset) {
+        selectedFactoryPresetIndex = nil
+        currentParams = preset.parameters
+        currentPresetName = preset.name
+        applyParametersToDSP()
+    }
+
+    func saveCurrentPreset(named name: String) throws {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        var preset = PortaPreset(name: trimmed, author: ProcessInfo.processInfo.processName, parameters: currentParams)
+        if let index = selectedFactoryPresetIndex {
+            preset.parameters = factoryPresets[index].parameters
+        }
+        try presetStore.savePreset(preset)
+        userPresets = presetStore.loadPresets()
+        selectedFactoryPresetIndex = nil
+        currentPresetName = preset.name
+        currentParams = preset.parameters
+        applyParametersToDSP()
+    }
+
+    func reloadUserPresets() {
+        userPresets = presetStore.loadPresets()
     }
 
     func start() {
@@ -86,6 +134,7 @@ final class AudioEngineManager: ObservableObject {
         let (node, dsp) = try await installDSPNode()
         avUnit = node
         dspUnit = dsp
+        applyParametersToDSP()
         let format = engine.inputNode.inputFormat(forBus: 0)
         engine.connect(engine.inputNode, to: node, format: format)
         engine.connect(node, to: engine.mainMixerNode, format: format)
@@ -127,4 +176,13 @@ final class AudioEngineManager: ObservableObject {
         }
     }
     #endif
+
+    private func applyParametersToDSP() {
+        guard let dspUnit else { return }
+        if let index = selectedFactoryPresetIndex {
+            dspUnit.applyFactoryPreset(at: index)
+        } else {
+            dspUnit.updateParameters(currentParams)
+        }
+    }
 }
