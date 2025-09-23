@@ -1,0 +1,13 @@
+[
+  { "name": "feature", "color": "1D76DB", "description": "New feature or capability" },
+  { "name": "bug", "color": "D73A4A", "description": "Something isn't working" },
+  { "name": "task", "color": "5319E7", "description": "Engineering task / refactor" },
+  { "name": "docs", "color": "0E8A16", "description": "Documentation related" },
+  { "name": "testing", "color": "FBCA04", "description": "Tests and QA" },
+  { "name": "infra", "color": "0052CC", "description": "CI, build, or infra" },
+  { "name": "audio", "color": "5319E7", "description": "DSP or audio-specific work" },
+  { "name": "bridge", "color": "E99695", "description": "Swift↔C bridge work" },
+  { "name": "platform", "color": "BFDADC", "description": "Cross-platform / Darwin vs Linux" },
+  { "name": "good first issue", "color": "7057FF", "description": "Easy starter task" }
+]
+

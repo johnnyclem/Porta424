@@ -1,0 +1,23 @@
+name: Engineering task
+description: Track a specific engineering task
+labels: [task]
+body:
+  - type: input
+    id: depends
+    attributes:
+      label: Depends on (issue links)
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps / Subtasks (checklist-friendly)
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+

@@ -1,0 +1,32 @@
+name: Feature request
+description: Request or spec a new feature
+labels: [feature]
+body:
+  - type: input
+    id: title
+    attributes:
+      label: Title
+      placeholder: Short feature title
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What outcome do we want?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What is in/out of scope?
+  - type: checkboxes
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      options:
+        - label: Builds on macOS
+        - label: Tests included
+        - label: Docs updated
+

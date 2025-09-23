@@ -1,0 +1,28 @@
+name: Bug report
+description: File a bug
+labels: [bug]
+body:
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      placeholder: macOS 15, Xcode 16.x, Swift 5.10
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to Reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior / Logs
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes / Screenshots
+
