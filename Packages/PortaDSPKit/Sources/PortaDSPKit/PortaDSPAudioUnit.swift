@@ -264,6 +264,15 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
     private var scratchCapacity: Int = 0
     private var dspHandle: porta_dsp_handle?
     private var lastParams = PortaDSP.Params()
+    private lazy var internalFactoryPresets: [AUAudioUnitPreset] = {
+        PortaPreset.factoryPresets.enumerated().map { index, preset in
+            let descriptor = AUAudioUnitPreset()
+            descriptor.number = index
+            descriptor.name = preset.name
+            return descriptor
+        }
+    }()
+    private var currentPresetSelection: AUAudioUnitPreset?
 
     public override var canProcessInPlace: Bool { true }
     public override var parameterTree: AUParameterTree? { parameterTreeImpl }
@@ -367,6 +376,7 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
             }
         }
         updateParameters(updated)
+        setParameters(params, clearPresetSelection: true)
     }
 
     public func readMeters() -> [Float] {
@@ -387,6 +397,52 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
     private func pushParametersToDSP() {
         guard let handle = dspHandle else { return }
         var cParams = lastParams.makeCParams()
+
+    public override var supportsUserPresets: Bool { true }
+
+    public override var factoryPresets: [AUAudioUnitPreset]? {
+        internalFactoryPresets
+    }
+
+    public override var currentPreset: AUAudioUnitPreset? {
+        get { currentPresetSelection }
+        set {
+            guard let newValue else {
+                currentPresetSelection = nil
+                return
+            }
+            if let index = factoryPresetIndex(for: newValue.number) {
+                applyFactoryPreset(at: index)
+            } else {
+                currentPresetSelection = newValue
+            }
+        }
+    }
+
+    public func applyFactoryPreset(at index: Int) {
+        guard index >= 0, index < PortaPreset.factoryPresets.count else { return }
+        let preset = PortaPreset.factoryPresets[index]
+        currentPresetSelection = internalFactoryPresets[index]
+        applyPresetParameters(preset.parameters)
+    }
+
+    private func factoryPresetIndex(for number: Int) -> Int? {
+        let index = number
+        guard index >= 0, index < internalFactoryPresets.count else { return nil }
+        return index
+    }
+
+    private func applyPresetParameters(_ params: PortaDSP.Params) {
+        setParameters(params, clearPresetSelection: false)
+    }
+
+    private func setParameters(_ params: PortaDSP.Params, clearPresetSelection: Bool) {
+        lastParams = params
+        if clearPresetSelection {
+            currentPresetSelection = nil
+        }
+        guard let handle = dspHandle else { return }
+        var cParams = params.makeCParams()
         porta_update_params(handle, &cParams)
     }
 
@@ -403,7 +459,7 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
         interleavedScratch = UnsafeMutablePointer<Float>.allocate(capacity: scratchCapacity)
         interleavedScratch?.initialize(repeating: 0, count: scratchCapacity)
         dspHandle = porta_create(outputBus.format.sampleRate, Int32(frames), Int32(channels))
-        updateParameters(lastParams)
+        applyPresetParameters(lastParams)
     }
 
     public override func deallocateRenderResources() {
