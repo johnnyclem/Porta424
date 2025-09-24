@@ -30,6 +30,13 @@ public:
         dropoutRatePerMinute_ = std::max(ratePerMinute, 0.0f);
     }
 
+    void setSeed(uint32_t seed) { rngState_ = seed; }
+
+    void setHoldRangeSamplesForTesting(int minSamples, int maxSamples) {
+        minHoldSamples_ = std::max(1, minSamples);
+        maxHoldSamples_ = std::max(minHoldSamples_, maxSamples);
+    }
+
     void process(float* interleaved, int frames, int channels) {
         if (!interleaved || frames <= 0 || channels <= 0) {
             return;
@@ -55,43 +62,59 @@ private:
     enum class Stage { Idle, Attack, Hold, Release };
 
     float advance(float triggerProbability) {
-        switch (stage_) {
-            case Stage::Idle:
-                envelope_ = 1.0f;
-                if (dropoutRatePerMinute_ > 0.0f && randomFloat() < triggerProbability) {
-                    startEvent();
-                }
-                break;
-            case Stage::Attack:
-                if (stageSamplesRemaining_ > 0) {
-                    envelope_ -= attackStep_;
-                    --stageSamplesRemaining_;
-                }
-                if (stageSamplesRemaining_ <= 0) {
-                    envelope_ = minGain_;
-                    holdSamplesRemaining_ = randomHoldSamples();
-                    stage_ = Stage::Hold;
-                }
-                break;
-            case Stage::Hold:
-                if (--holdSamplesRemaining_ <= 0) {
-                    stage_ = Stage::Release;
-                    stageSamplesRemaining_ = releaseSamples_;
-                }
-                envelope_ = minGain_;
-                break;
-            case Stage::Release:
-                if (stageSamplesRemaining_ > 0) {
-                    envelope_ += releaseStep_;
-                    --stageSamplesRemaining_;
-                }
-                if (stageSamplesRemaining_ <= 0) {
+        while (true) {
+            switch (stage_) {
+                case Stage::Idle:
                     envelope_ = 1.0f;
-                    stage_ = Stage::Idle;
-                } else {
-                    envelope_ = std::min(envelope_, 1.0f);
-                }
-                break;
+                    if (dropoutRatePerMinute_ > 0.0f && randomFloat() < triggerProbability) {
+                        startEvent();
+                        continue;
+                    }
+                    break;
+                case Stage::Attack:
+                    if (stageSamplesRemaining_ > 0) {
+                        envelope_ -= attackStep_;
+                        --stageSamplesRemaining_;
+                    }
+                    if (stageSamplesRemaining_ <= 0) {
+                        envelope_ = minGain_;
+                        const int dropoutLengthSamples = randomHoldSamples();
+                        holdSamplesRemaining_ = std::max(0, dropoutLengthSamples - 1);
+                        if (holdSamplesRemaining_ > 0) {
+                            stage_ = Stage::Hold;
+                        } else {
+                            stage_ = Stage::Release;
+                            stageSamplesRemaining_ = releaseSamples_;
+                        }
+                    }
+                    break;
+                case Stage::Hold:
+                    envelope_ = minGain_;
+                    if (holdSamplesRemaining_ > 0) {
+                        --holdSamplesRemaining_;
+                        if (holdSamplesRemaining_ <= 0) {
+                            stage_ = Stage::Release;
+                            stageSamplesRemaining_ = releaseSamples_;
+                        }
+                    } else {
+                        stage_ = Stage::Release;
+                        stageSamplesRemaining_ = releaseSamples_;
+                    }
+                    break;
+                case Stage::Release:
+                    if (stageSamplesRemaining_ > 0) {
+                        envelope_ += releaseStep_;
+                        --stageSamplesRemaining_;
+                    }
+                    if (stageSamplesRemaining_ <= 0) {
+                        envelope_ = 1.0f;
+                        stage_ = Stage::Idle;
+                    } else {
+                        envelope_ = std::min(envelope_, 1.0f);
+                    }
+                    break;
+            }
+            break;
         }
 
         envelope_ = std::clamp(envelope_, minGain_, 1.0f);

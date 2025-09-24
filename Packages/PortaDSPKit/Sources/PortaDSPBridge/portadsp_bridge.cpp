@@ -367,3 +367,16 @@ int porta_get_meters_dbfs(porta_dsp_handle h, float* outDbfs, int maxCh) {
     }
     return n;
 }
+
+void porta_test_apply_dropouts(float* interleaved, int frames, int channels, float sampleRate, float dropoutRatePerMin, int dropoutLengthSamples, uint32_t seed) {
+    if (!interleaved || frames <= 0 || channels <= 0 || dropoutLengthSamples <= 0) {
+        return;
+    }
+
+    Dropouts dropouts;
+    dropouts.prepare(sampleRate, channels);
+    dropouts.setRate(dropoutRatePerMin);
+    dropouts.setSeed(seed);
+    dropouts.setHoldRangeSamplesForTesting(dropoutLengthSamples, dropoutLengthSamples);
+    dropouts.process(interleaved, frames, channels);
+}

@@ -38,6 +38,7 @@ int porta_get_meters_dbfs(porta_dsp_handle h, float* outDbfs, int maxChannels);
 // Test helpers for DSP validation.
 void porta_test_render_hiss(float* out, int frames, int channels, float sampleRate, float hissLevelDbFS, uint64_t seed);
 void porta_test_apply_hf_loss(const float* input, float* output, int frames, int channels, float sampleRate, float cutoffHz);
+void porta_test_apply_dropouts(float* interleaved, int frames, int channels, float sampleRate, float dropoutRatePerMin, int dropoutLengthSamples, uint32_t seed);
 
 #ifdef __cplusplus
 } // extern "C"
