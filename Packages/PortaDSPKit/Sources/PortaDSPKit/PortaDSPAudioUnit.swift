@@ -9,6 +9,205 @@ public enum PortaDSPAudioUnitError: Error {
 }
 
 public final class PortaDSPAudioUnit: AUAudioUnit {
+    public enum ParameterID: Int, CaseIterable {
+        case wowDepth
+        case flutterDepth
+        case headBumpGainDb
+        case headBumpFreqHz
+        case satDriveDb
+        case hissLevelDbFS
+        case lpfCutoffHz
+        case azimuthJitterMs
+        case crosstalkDb
+        case dropoutRatePerMin
+        case nrTrack4Bypass
+
+        public var identifier: String { PortaDSPAudioUnit.definition(for: self).identifier }
+        public var name: String { PortaDSPAudioUnit.definition(for: self).name }
+        public var unit: AudioUnitParameterUnit { PortaDSPAudioUnit.definition(for: self).unit }
+        public var minValue: AUValue { PortaDSPAudioUnit.definition(for: self).range.lowerBound }
+        public var maxValue: AUValue { PortaDSPAudioUnit.definition(for: self).range.upperBound }
+        public var defaultValue: AUValue { PortaDSPAudioUnit.definition(for: self).defaultValue }
+        public var flags: AudioUnitParameterOptions { PortaDSPAudioUnit.definition(for: self).flags }
+        public var range: ClosedRange<AUValue> { PortaDSPAudioUnit.definition(for: self).range }
+        public var address: AUParameterAddress { AUParameterAddress(rawValue) }
+    }
+
+    private enum Storage {
+        case float(WritableKeyPath<PortaDSP.Params, Float>)
+        case bool(WritableKeyPath<PortaDSP.Params, Bool>)
+    }
+
+    private struct ParameterDefinition {
+        let id: ParameterID
+        let identifier: String
+        let name: String
+        let unit: AudioUnitParameterUnit
+        let range: ClosedRange<AUValue>
+        let defaultValue: AUValue
+        let flags: AudioUnitParameterOptions
+        let storage: Storage
+
+        func value(from params: PortaDSP.Params) -> AUValue {
+            switch storage {
+            case let .float(keyPath):
+                return params[keyPath: keyPath]
+            case let .bool(keyPath):
+                return params[keyPath: keyPath] ? 1.0 : 0.0
+            }
+        }
+
+        func apply(value: AUValue, to params: inout PortaDSP.Params) {
+            switch storage {
+            case let .float(keyPath):
+                params[keyPath: keyPath] = value
+            case let .bool(keyPath):
+                params[keyPath: keyPath] = value >= 0.5
+            }
+        }
+    }
+
+    private static let parameterDefinitions: [ParameterDefinition] = {
+        let defaults = PortaDSP.Params()
+        let baseFlags: AudioUnitParameterOptions = [.flag_IsReadable, .flag_IsWritable]
+        return [
+            ParameterDefinition(
+                id: .wowDepth,
+                identifier: "wowDepth",
+                name: "Wow Depth",
+                unit: .generic,
+                range: 0.0...0.005,
+                defaultValue: defaults.wowDepth,
+                flags: baseFlags,
+                storage: .float(\.wowDepth)
+            ),
+            ParameterDefinition(
+                id: .flutterDepth,
+                identifier: "flutterDepth",
+                name: "Flutter Depth",
+                unit: .generic,
+                range: 0.0...0.003,
+                defaultValue: defaults.flutterDepth,
+                flags: baseFlags,
+                storage: .float(\.flutterDepth)
+            ),
+            ParameterDefinition(
+                id: .headBumpGainDb,
+                identifier: "headBumpGainDb",
+                name: "Head Bump Gain",
+                unit: .decibels,
+                range: -12.0...12.0,
+                defaultValue: defaults.headBumpGainDb,
+                flags: baseFlags,
+                storage: .float(\.headBumpGainDb)
+            ),
+            ParameterDefinition(
+                id: .headBumpFreqHz,
+                identifier: "headBumpFreqHz",
+                name: "Head Bump Freq",
+                unit: .hertz,
+                range: 20.0...200.0,
+                defaultValue: defaults.headBumpFreqHz,
+                flags: baseFlags,
+                storage: .float(\.headBumpFreqHz)
+            ),
+            ParameterDefinition(
+                id: .satDriveDb,
+                identifier: "satDriveDb",
+                name: "Saturation Drive",
+                unit: .decibels,
+                range: -24.0...24.0,
+                defaultValue: defaults.satDriveDb,
+                flags: baseFlags,
+                storage: .float(\.satDriveDb)
+            ),
+            ParameterDefinition(
+                id: .hissLevelDbFS,
+                identifier: "hissLevelDbFS",
+                name: "Hiss Level",
+                unit: .decibels,
+                range: -120.0...0.0,
+                defaultValue: defaults.hissLevelDbFS,
+                flags: baseFlags,
+                storage: .float(\.hissLevelDbFS)
+            ),
+            ParameterDefinition(
+                id: .lpfCutoffHz,
+                identifier: "lpfCutoffHz",
+                name: "Low-Pass Cutoff",
+                unit: .hertz,
+                range: 1_000.0...20_000.0,
+                defaultValue: defaults.lpfCutoffHz,
+                flags: baseFlags,
+                storage: .float(\.lpfCutoffHz)
+            ),
+            ParameterDefinition(
+                id: .azimuthJitterMs,
+                identifier: "azimuthJitterMs",
+                name: "Azimuth Jitter",
+                unit: .milliseconds,
+                range: 0.0...2.0,
+                defaultValue: defaults.azimuthJitterMs,
+                flags: baseFlags,
+                storage: .float(\.azimuthJitterMs)
+            ),
+            ParameterDefinition(
+                id: .crosstalkDb,
+                identifier: "crosstalkDb",
+                name: "Crosstalk",
+                unit: .decibels,
+                range: -120.0...0.0,
+                defaultValue: defaults.crosstalkDb,
+                flags: baseFlags,
+                storage: .float(\.crosstalkDb)
+            ),
+            ParameterDefinition(
+                id: .dropoutRatePerMin,
+                identifier: "dropoutRatePerMin",
+                name: "Dropout Rate",
+                unit: .rate,
+                range: 0.0...10.0,
+                defaultValue: defaults.dropoutRatePerMin,
+                flags: baseFlags,
+                storage: .float(\.dropoutRatePerMin)
+            ),
+            ParameterDefinition(
+                id: .nrTrack4Bypass,
+                identifier: "nrTrack4Bypass",
+                name: "NR Track 4 Bypass",
+                unit: .boolean,
+                range: 0.0...1.0,
+                defaultValue: defaults.nrTrack4Bypass ? 1.0 : 0.0,
+                flags: baseFlags,
+                storage: .bool(\.nrTrack4Bypass)
+            )
+        ]
+    }()
+
+    private static let parameterDefinitionsByID: [ParameterID: ParameterDefinition] = {
+        var map: [ParameterID: ParameterDefinition] = [:]
+        for definition in parameterDefinitions {
+            map[definition.id] = definition
+        }
+        return map
+    }()
+
+    static func definition(for id: ParameterID) -> ParameterDefinition {
+        guard let definition = parameterDefinitionsByID[id] else {
+            fatalError("Missing definition for parameter id \(id)")
+        }
+        return definition
+    }
+
+    private static func definition(forAddress address: AUParameterAddress) -> ParameterDefinition? {
+        guard let id = ParameterID(rawValue: Int(address)) else { return nil }
+        return parameterDefinitionsByID[id]
+    }
+
+    private let parameterTreeImpl: AUParameterTree
+    private let parameterMap: [ParameterID: AUParameter]
+    private var parameterObserverToken: AUParameterObserverToken?
+
     // MARK: Component Registration
 
     public static let componentDescription = AudioComponentDescription(
@@ -76,8 +275,29 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
     private var currentPresetSelection: AUAudioUnitPreset?
 
     public override var canProcessInPlace: Bool { true }
+    public override var parameterTree: AUParameterTree? { parameterTreeImpl }
 
     public override init(componentDescription: AudioComponentDescription, options: AudioComponentInstantiationOptions = []) throws {
+        var map: [ParameterID: AUParameter] = [:]
+        for definition in PortaDSPAudioUnit.parameterDefinitions {
+            let parameter = AUParameterTree.createParameter(
+                withIdentifier: definition.identifier,
+                name: definition.name,
+                address: definition.id.address,
+                min: definition.range.lowerBound,
+                max: definition.range.upperBound,
+                unit: definition.unit,
+                unitName: nil,
+                flags: definition.flags,
+                valueStrings: nil,
+                dependentParameters: nil
+            )
+            parameter.value = definition.defaultValue
+            map[definition.id] = parameter
+        }
+        parameterMap = map
+        let orderedParameters = ParameterID.allCases.compactMap { map[$0] }
+        parameterTreeImpl = AUParameterTree.createTree(withChildren: orderedParameters)
         let defaultFormat = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
             sampleRate: 48_000,
@@ -90,6 +310,9 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
         maximumFramesToRender = 4096
         inputBusses = AUAudioUnitBusArray(owner: self, busType: .input, busses: [inputBus])
         outputBusses = AUAudioUnitBusArray(owner: self, busType: .output, busses: [outputBus])
+        parameterObserverToken = parameterTreeImpl.token(byAddingParameterObserver: { [weak self] address, value in
+            self?.handleParameterChange(address: address, value: value)
+        })
     }
 
     deinit {
@@ -100,6 +323,59 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
     // MARK: Parameter Handling
 
     public func updateParameters(_ params: PortaDSP.Params) {
+        lastParams = params
+        for definition in PortaDSPAudioUnit.parameterDefinitions {
+            guard let parameter = parameterMap[definition.id] else { continue }
+            let value = definition.value(from: params)
+            if let token = parameterObserverToken {
+                parameter.setValue(value, originator: token)
+            } else {
+                parameter.value = value
+            }
+        }
+        pushParametersToDSP()
+    }
+
+    public func currentParameters() -> PortaDSP.Params {
+        lastParams
+    }
+
+    public func exportPresetDictionary() -> [String: Any] {
+        var dictionary: [String: Any] = [:]
+        let snapshot = lastParams
+        for definition in PortaDSPAudioUnit.parameterDefinitions {
+            switch definition.storage {
+            case let .float(keyPath):
+                dictionary[definition.identifier] = snapshot[keyPath: keyPath]
+            case let .bool(keyPath):
+                dictionary[definition.identifier] = snapshot[keyPath: keyPath]
+            }
+        }
+        return dictionary
+    }
+
+    public func applyPresetDictionary(_ dictionary: [String: Any]) {
+        var updated = lastParams
+        for definition in PortaDSPAudioUnit.parameterDefinitions {
+            guard let rawValue = dictionary[definition.identifier] else { continue }
+            switch definition.storage {
+            case let .float(keyPath):
+                if let number = rawValue as? NSNumber {
+                    updated[keyPath: keyPath] = number.floatValue
+                } else if let value = rawValue as? Float {
+                    updated[keyPath: keyPath] = value
+                } else if let value = rawValue as? Double {
+                    updated[keyPath: keyPath] = Float(value)
+                }
+            case let .bool(keyPath):
+                if let boolValue = rawValue as? Bool {
+                    updated[keyPath: keyPath] = boolValue
+                } else if let number = rawValue as? NSNumber {
+                    updated[keyPath: keyPath] = number.boolValue
+                }
+            }
+        }
+        updateParameters(updated)
         setParameters(params, clearPresetSelection: true)
     }
 
@@ -109,6 +385,18 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
         porta_get_meters_dbfs(handle, &meters, Int32(meters.count))
         return meters
     }
+
+    private func handleParameterChange(address: AUParameterAddress, value: AUValue) {
+        guard let definition = PortaDSPAudioUnit.definition(forAddress: address) else { return }
+        var updated = lastParams
+        definition.apply(value: value, to: &updated)
+        lastParams = updated
+        pushParametersToDSP()
+    }
+
+    private func pushParametersToDSP() {
+        guard let handle = dspHandle else { return }
+        var cParams = lastParams.makeCParams()
 
     public override var supportsUserPresets: Bool { true }
 
@@ -411,6 +699,14 @@ public final class PortaDSPAudioUnit {
     ) {
         completionHandler(nil, nil, PortaDSPAudioUnitError.unsupportedPlatform)
     }
+
+    public func updateParameters(_ params: PortaDSP.Params) {}
+
+    public func currentParameters() -> PortaDSP.Params { PortaDSP.Params() }
+
+    public func exportPresetDictionary() -> [String: Any] { [:] }
+
+    public func applyPresetDictionary(_ dictionary: [String: Any]) {}
 }
 
 public enum PortaDSPNodeFactory {

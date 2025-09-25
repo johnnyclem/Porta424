@@ -73,6 +73,24 @@ struct ContentView: View {
             }
             .buttonStyle(.borderedProminent)
 
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Hiss Level")
+                    .font(.headline)
+
+                Slider(
+                    value: Binding(
+                        get: { Double(engineManager.hissLevelDbFS) },
+                        set: { engineManager.hissLevelDbFS = Float($0) }
+                    ),
+                    in: -120...0
+                )
+
+                Text(String(format: "%.1f dBFS", engineManager.hissLevelDbFS))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
             GroupBox("Presets") {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Current preset: \(engineManager.currentPresetName)")

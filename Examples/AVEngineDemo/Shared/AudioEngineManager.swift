@@ -16,6 +16,13 @@ final class AudioEngineManager: ObservableObject {
     }
 
     @Published private(set) var state: State = .idle
+    @Published var hissLevelDbFS: Float = PortaDSP.Params().hissLevelDbFS {
+        didSet {
+            pendingParams.hissLevelDbFS = hissLevelDbFS
+            guard let dspUnit else { return }
+            updateHissParameter(on: dspUnit)
+        }
+    }
     @Published private(set) var currentPresetName: String
     @Published private(set) var userPresets: [PortaPreset]
     @Published private(set) var meters: [Float] = Array(repeating: AudioEngineManager.meterFloor, count: 2)
@@ -43,6 +50,7 @@ final class AudioEngineManager: ObservableObject {
     private let engine = AVAudioEngine()
     private var dspUnit: PortaDSPAudioUnit?
     private var avUnit: AVAudioUnit?
+    private var pendingParams = PortaDSP.Params()
 
     // Preset management
     private let presetStore: PortaPresetStore
@@ -178,6 +186,7 @@ final class AudioEngineManager: ObservableObject {
         let (node, dsp) = try await installDSPNode()
         avUnit = node
         dspUnit = dsp
+        applyPendingParametersToDSP()
         currentParams.satDriveDb = satDriveDb
         currentParams.headBumpGainDb = headBumpGainDb
         currentParams.wowDepth = wowDepth
@@ -228,6 +237,30 @@ final class AudioEngineManager: ObservableObject {
     }
     #endif
 
+    private func applyPendingParametersToDSP() {
+        guard let dspUnit else { return }
+        dspUnit.updateParameters(pendingParams)
+        logHissRoundTrip(on: dspUnit)
+    }
+
+    private func updateHissParameter(on dsp: PortaDSPAudioUnit) {
+        dsp.parameterTree?
+            .parameter(withAddress: PortaDSPAudioUnit.ParameterID.hissLevelDbFS.address)?
+            .setValue(hissLevelDbFS, originator: nil)
+        logHissRoundTrip(on: dsp)
+    }
+
+    private func logHissRoundTrip(on dsp: PortaDSPAudioUnit) {
+        let snapshot = dsp.currentParameters()
+        print(
+            String(
+                format: "[PortaDSPAudioUnit] hissLevelDbFS set to %.1f dBFS (cached %.1f dBFS)",
+                hissLevelDbFS,
+                snapshot.hissLevelDbFS
+            )
+        )
+    }
+}
     private func applyParametersToDSP() {
         guard let dspUnit else { return }
         if let index = selectedFactoryPresetIndex {
