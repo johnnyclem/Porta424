@@ -26,6 +26,10 @@ final class AudioEngineManager: ObservableObject {
     @Published private(set) var currentPresetName: String
     @Published private(set) var userPresets: [PortaPreset]
     @Published private(set) var meters: [Float] = Array(repeating: AudioEngineManager.meterFloor, count: 2)
+    @Published private(set) var presets: [PortaDSPPreset]
+    @Published var selectedPreset: PortaDSPPreset {
+        didSet { applySelectedPreset() }
+    }
     @Published var params: PortaDSP.Params {
         didSet {
             applyParameters()
@@ -89,6 +93,13 @@ final class AudioEngineManager: ObservableObject {
         self.presetStore = presetStore
         self.userPresets = presetStore.loadPresets()
         self.currentPresetName = "Default"
+    }
+
+    init(presets: [PortaDSPPreset] = PortaDSPPreset.factoryPresets) {
+        let availablePresets = presets.isEmpty ? [PortaDSPPreset.cleanCassette] : presets
+        self.presets = availablePresets
+        self.selectedPreset = availablePresets.first ?? PortaDSPPreset.cleanCassette
+        applySelectedPreset()
     }
 
     var statusText: String {
@@ -201,6 +212,7 @@ final class AudioEngineManager: ObservableObject {
         let (node, dsp) = try await installDSPNode()
         avUnit = node
         dspUnit = dsp
+        applySelectedPreset()
         applyParameters()
         applyPendingParametersToDSP()
         currentParams.satDriveDb = satDriveDb
@@ -351,6 +363,10 @@ final class AudioEngineManager: ObservableObject {
         smoothedMeters = meters
     }
 
+    private func applySelectedPreset() {
+        let params = selectedPreset.parameters
+        dspUnit?.updateParameters(params)
+    }
     private func applyParameters() {
         dspUnit?.updateParameters(params)
     }

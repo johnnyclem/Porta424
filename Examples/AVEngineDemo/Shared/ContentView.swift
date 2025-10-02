@@ -18,6 +18,13 @@ struct ContentView: View {
 
             MeterStack(levels: engineManager.meters)
 
+            Picker("Factory preset", selection: $engineManager.selectedPreset) {
+                ForEach(engineManager.presets) { preset in
+                    Text(preset.name).tag(preset)
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(maxWidth: .infinity, alignment: .leading)
             ParameterControls(params: $engineManager.params)
             VStack(spacing: 16) {
                 ParameterSlider(
