@@ -35,6 +35,9 @@ void porta_process_interleaved(porta_dsp_handle h, float* interleaved, int frame
 // Simple meter readback (RMS in dBFS for up to 8 channels)
 int porta_get_meters_dbfs(porta_dsp_handle h, float* outDbfs, int maxChannels);
 
+float porta_test_saturation(float sample, float driveDb);
+void porta_test_head_bump(const float* input, float* output, int frames, float sampleRate, float gainDb, float freqHz);
+void porta_test_wow_flutter(const float* input, float* output, int frames, float sampleRate, float wowDepth, float flutterDepth, float wowRate, float flutterRate);
 // Test helpers for DSP validation.
 void porta_test_render_hiss(float* out, int frames, int channels, float sampleRate, float hissLevelDbFS, uint64_t seed);
 void porta_test_apply_hf_loss(const float* input, float* output, int frames, int channels, float sampleRate, float cutoffHz);
