@@ -19,7 +19,9 @@ let package = Package(
             path: "Packages/PortaDSPKit/Sources/PortaDSPBridge",
             publicHeadersPath: "include",
             cxxSettings: [
-                .define("PORTA_DSP_BRIDGE")
+                .define("PORTA_DSP_BRIDGE"),
+                .headerSearchPath("../../../../DSPCore"),
+                .headerSearchPath("../../../../DSPCore/include")
             ],
             linkerSettings: [
                 .linkedLibrary("atomic", .when(platforms: [.linux]))
@@ -34,6 +36,11 @@ let package = Package(
             name: "PortaDSPKitTests",
             dependencies: ["PortaDSPKit"],
             path: "Packages/PortaDSPKit/Tests"
+        ),
+        .testTarget(
+            name: "PortaDSPPerformanceTests",
+            dependencies: ["PortaDSPKit"],
+            path: "Packages/PortaDSPKit/PerformanceTests"
         )
     ],
     cxxLanguageStandard: .cxx17

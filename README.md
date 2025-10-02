@@ -49,6 +49,23 @@ PortaDSPAudioUnit.makeEngineNode(engine: engine) { unit, audioUnit, error in
 
 The snippet wires the Porta DSP node between the input and output mix. Customize the `Params` struct before calling `update(_:)` to shape the tape processing.
 
+## Factory presets
+
+For quick starting points, PortaDSPKit bundles five curated presets exposed through `PortaDSPPreset.factoryPresets`:
+
+- **Clean Cassette** – gentle modulation and reduced noise for subtle coloration.
+- **Warm Bump** – emphasises the head bump and saturation for a low-end lift.
+- **Lo-Fi Warble** – exaggerated wow/flutter with higher hiss for nostalgic textures.
+- **Crunchy Saturation** – restrained modulation with forward, harmonically rich mids.
+- **Dusty Archive** – narrow bandwidth and audible noise reminiscent of an aged tape.
+
+Apply a preset by passing its parameters into either `PortaDSP` or `PortaDSPAudioUnit`:
+
+```swift
+let preset = PortaDSPPreset.warmBump
+porta.update(preset.parameters)
+```
+
 ## Running the AVEngine demo
 
 The repository contains a simple sample app that boots an `AVAudioEngine` session with Porta inserted:
@@ -58,6 +75,12 @@ open Examples/AVEngineDemo/AVEngineDemo.xcodeproj
 ```
 
 Run the macOS target from Xcode, select a microphone input, and you should hear the effected output routed through the default device.
+
+## Preset format & compatibility
+
+`PortaDSPKit` ships with a codable `PortaPreset` struct that captures a full `PortaDSP.Params` snapshot together with light metadata. Presets are encoded as JSON and tagged with a `formatVersion` field; the current schema version is `1`, and presets report compatibility via `isCompatible()`. Factory content is bundled inside the library and exposed to hosts through `AUAudioUnitPreset`, covering "Clean Cassette", "Warm Bump", "Crunchy Saturation", "Wobbly Lo-Fi", and "Noisy VHS" styles.
+
+The AVEngine demo app persists user presets by serializing `PortaPreset` instances to `.portapreset` files under the user's Application Support directory (falling back to Documents or temporary storage on platforms where Application Support is unavailable). Saved presets load across launches and can be re-applied alongside the factory set.
 
 ## Running tests on macOS
 
