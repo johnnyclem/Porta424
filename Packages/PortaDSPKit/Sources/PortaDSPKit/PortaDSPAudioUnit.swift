@@ -376,7 +376,7 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
             }
         }
         updateParameters(updated)
-        setParameters(params, clearPresetSelection: true)
+        setParameters(updated, clearPresetSelection: true)
     }
 
     public func readMeters() -> [Float] {
@@ -397,6 +397,8 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
     private func pushParametersToDSP() {
         guard let handle = dspHandle else { return }
         var cParams = lastParams.makeCParams()
+        porta_update_params(handle, &cParams)
+    }
 
     public override var supportsUserPresets: Bool { true }
 

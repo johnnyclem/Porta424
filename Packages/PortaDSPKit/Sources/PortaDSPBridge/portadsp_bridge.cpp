@@ -2,108 +2,32 @@
 
 #include <algorithm>
 #include <atomic>
-#include "dsp_context.h"
-#include <algorithm>
-#include <atomic>
-#include <array>
 #include <cmath>
-#include <cstdio>
+#include <cstdint>
 #include <cstring>
+#include <mutex>
 #include <vector>
 
+#include "../../../../DSPCore/dsp_context.h"
 #include "../../../../DSPCore/include/modules/azimuth.h"
 #include "../../../../DSPCore/include/modules/compander.h"
 #include "../../../../DSPCore/include/modules/crosstalk.h"
 #include "../../../../DSPCore/include/modules/dropouts.h"
-#include "../../../../DSPCore/include/modules/eq.h"
-#include "../../../../DSPCore/include/modules/head_bump.h"
-#include "../../../../DSPCore/include/modules/hf_loss.h"
-#include "../../../../DSPCore/include/modules/hiss.h"
-#include "../../../../DSPCore/include/modules/meters.h"
-#include "../../../../DSPCore/include/modules/saturation.h"
-#include "../../../../DSPCore/include/modules/wow_flutter.h"
-#include "../../../../DSPCore/include/modules/azimuth.h"
-#include "../../../../DSPCore/include/modules/crosstalk.h"
 #include "../../../../DSPCore/include/modules/head_bump.h"
 #include "../../../../DSPCore/include/modules/hf_loss.h"
 #include "../../../../DSPCore/include/modules/hiss.h"
 #include "../../../../DSPCore/include/modules/wow_flutter.h"
-#include <mutex>
-#include <vector>
 
 namespace {
 
-constexpr float kMinDriveDb = -60.0f;
-constexpr float kMaxDriveDb = 40.0f;
-constexpr float kDriveStepDb = 1.0f;
-constexpr int kTrimTableSize = static_cast<int>((kMaxDriveDb - kMinDriveDb) / kDriveStepDb) + 1;
-
-float dbToLinear(float db) {
-    return std::pow(10.0f, db / 20.0f);
-}
-
-float computeTrimForDriveLinear(float driveLinear) {
-    if (!std::isfinite(driveLinear)) {
-        return 1.0f;
-    }
-    if (driveLinear <= 0.0f) {
-        return 1.0f;
-    }
-
-    constexpr int kSineSamples = 2048;
-    const double omega = 2.0 * std::acos(-1.0) / static_cast<double>(kSineSamples);
-    double acc = 0.0;
-    for (int i = 0; i < kSineSamples; ++i) {
-        double phase = omega * (i + 0.5);
-        double x = std::sin(phase);
-        double y = std::tanh(static_cast<double>(driveLinear) * x);
-        acc += y * y;
-    }
-    double rmsOut = std::sqrt(acc / static_cast<double>(kSineSamples));
-    constexpr double rmsIn = 0.7071067811865476; // RMS of a full-scale sine wave
-    if (rmsOut < 1e-12) {
-        return 1.0f;
-    }
-    return static_cast<float>(rmsIn / rmsOut);
-}
-
-float lookupTrim(float driveDb) {
-    static std::once_flag onceFlag;
-    static std::array<float, kTrimTableSize> trimTable{};
-    std::call_once(onceFlag, [] {
-        for (int i = 0; i < kTrimTableSize; ++i) {
-            float db = kMinDriveDb + static_cast<float>(i) * kDriveStepDb;
-            float linear = dbToLinear(db);
-            trimTable[i] = computeTrimForDriveLinear(linear);
-        }
-    });
-
-    if (driveDb <= kMinDriveDb) {
-        return trimTable.front();
-    }
-    if (driveDb >= kMaxDriveDb) {
-        return trimTable.back();
-    }
-
-    float position = (driveDb - kMinDriveDb) / kDriveStepDb;
-    int index = static_cast<int>(std::floor(position));
-    float frac = position - static_cast<float>(index);
-    float a = trimTable[index];
-    float b = trimTable[index + 1];
-    return a + (b - a) * frac;
-}
-
-} // namespace
-
-class SaturationStage {
-public:
+struct SaturationStage {
     void prepare(float /*sampleRate*/, int /*channels*/) {
         driveLinearState_ = 1.0f;
         trimState_ = 1.0f;
-        targetDriveLinear_ = driveLinearState_;
-        targetTrim_ = trimState_;
-        blockSamples_ = 1;
+        targetDriveLinear_ = 1.0f;
+        targetTrim_ = 1.0f;
         processedSamples_ = 0;
+        blockSamples_ = 1;
         bypass_ = true;
     }
 
@@ -111,13 +35,13 @@ public:
         if (!std::isfinite(driveDb)) {
             driveDb = 0.0f;
         }
-        bool newBypass = std::fabs(driveDb) < 1.0e-3f;
+        const bool newBypass = std::fabs(driveDb) < 1.0e-3f;
         if (newBypass) {
             targetDriveLinear_ = 1.0f;
             targetTrim_ = 1.0f;
         } else {
             targetDriveLinear_ = std::max(dbToLinear(driveDb), 1.0e-6f);
-            targetTrim_ = lookupTrim(driveDb);
+            targetTrim_ = computeTrim(driveDb);
         }
         bypass_ = newBypass;
     }
@@ -138,11 +62,59 @@ public:
         if (bypass_) {
             return input;
         }
-        float shaped = std::tanh(driveLinearState_ * input);
+        const float driven = driveLinearState_ * input;
+        const float shaped = std::tanh(driven);
         return shaped * trimState_;
     }
 
 private:
+    static float dbToLinear(float db) {
+        return std::pow(10.0f, db / 20.0f);
+    }
+
+    static float computeTrim(float driveDb) {
+        constexpr int kTableSize = 64;
+        constexpr float kMinDb = -60.0f;
+        constexpr float kMaxDb = 40.0f;
+        constexpr float kStepDb = (kMaxDb - kMinDb) / (kTableSize - 1);
+
+        static std::once_flag once;
+        static float table[kTableSize];
+        std::call_once(once, [] {
+            for (int i = 0; i < kTableSize; ++i) {
+                float db = kMinDb + kStepDb * static_cast<float>(i);
+                const float linear = dbToLinear(db);
+                // RMS of tanh() drive for a sine wave.
+                constexpr int kSineSamples = 2048;
+                double acc = 0.0;
+                const double omega = 2.0 * std::acos(-1.0) / static_cast<double>(kSineSamples);
+                for (int n = 0; n < kSineSamples; ++n) {
+                    const double phase = omega * (n + 0.5);
+                    const double x = std::sin(phase);
+                    const double y = std::tanh(static_cast<double>(linear) * x);
+                    acc += y * y;
+                }
+                const double rmsOut = std::sqrt(acc / static_cast<double>(kSineSamples));
+                constexpr double rmsIn = 0.7071067811865476; // RMS of a full-scale sine wave
+                table[i] = rmsOut > 1e-12 ? static_cast<float>(rmsIn / rmsOut) : 1.0f;
+            }
+        });
+
+        if (driveDb <= kMinDb) {
+            return table[0];
+        }
+        if (driveDb >= kMaxDb) {
+            return table[kTableSize - 1];
+        }
+
+        const float position = (driveDb - kMinDb) / kStepDb;
+        const int index = static_cast<int>(std::floor(position));
+        const float frac = position - static_cast<float>(index);
+        const float a = table[index];
+        const float b = table[index + 1];
+        return a + (b - a) * frac;
+    }
+
     float driveLinearState_ = 1.0f;
     float trimState_ = 1.0f;
     float targetDriveLinear_ = 1.0f;
@@ -155,39 +127,32 @@ private:
 };
 
 struct PortaStubContext {
-    double fs = 48000.0;
+    double sampleRate = 48000.0;
     int maxBlock = 512;
-    int tracks = 4;
+    int maxTracks = 2;
+
     std::atomic<porta_params_t> params;
-    Saturation saturation;
-    HeadBump headBump;
-    WowFlutter wowFlutter;
-    Hiss hiss;
-    HFLoss hfLoss;
-    Azimuth azimuth;
-    Crosstalk crosstalk;
-    Dropouts dropouts;
-    Compander compander;
-    EQ eq;
-    Meters meters;
     porta_params_t currentParams{};
-    HeadBump headBump;
+
+    DSPContext dsp;
     std::vector<WowFlutter> wowFlutter;
+    HeadBump headBump;
+    SaturationStage saturation;
     HFLoss hfLoss;
     Hiss hiss;
     Azimuth azimuth;
     Crosstalk crosstalk;
-    std::vector<float> rmsAcc;
-    std::vector<int> rmsCount;
-    DSPContext dsp;
-    SaturationStage saturation;
+
     std::vector<float> channelScratch;
     std::vector<float> tempLeft;
     std::vector<float> tempRight;
+    std::vector<float> rmsAcc;
+    std::vector<int> rmsCount;
+
     int currentChannels = 0;
 };
 
-static porta_params_t makeDefaultParams() {
+porta_params_t makeDefaultParams() {
     porta_params_t p{};
     p.wowDepth = 0.0006f;
     p.flutterDepth = 0.0003f;
@@ -203,287 +168,232 @@ static porta_params_t makeDefaultParams() {
     return p;
 }
 
-static void updateModuleParameters(PortaStubContext* ctx, const porta_params_t& p) {
-    ctx->saturation.setDriveDb(p.satDriveDb);
-    ctx->headBump.setGainDb(p.headBumpGainDb);
-    ctx->headBump.setFrequency(p.headBumpFreqHz);
-    ctx->wowFlutter.setWowDepth(p.wowDepth);
-    ctx->wowFlutter.setFlutterDepth(p.flutterDepth);
-    ctx->hfLoss.setCutoffHz(p.lpfCutoffHz);
-    ctx->hiss.setLevelDbFS(p.hissLevelDbFS);
-    ctx->crosstalk.setAmountDb(p.crosstalkDb);
-    ctx->dropouts.setRatePerMinute(p.dropoutRatePerMin);
-}
+void updateModuleParameters(PortaStubContext& ctx, const porta_params_t& p) {
+    ctx.headBump.setParams(p.headBumpFreqHz, p.headBumpGainDb);
+    ctx.saturation.setDriveDb(p.satDriveDb);
+    float cutoffHz = p.lpfCutoffHz;
+    if (!std::isfinite(cutoffHz) || cutoffHz <= 0.0f) {
+        cutoffHz = static_cast<float>(ctx.sampleRate) * 0.45f;
+    }
+    ctx.hfLoss.setCutoff(cutoffHz);
+    ctx.hiss.setLevelDbFS(p.hissLevelDbFS);
+    ctx.crosstalk.setAmountDb(p.crosstalkDb);
 
-porta_dsp_handle porta_create(double sampleRate, int maxBlock, int tracks) {
-    auto* ctx = new PortaStubContext();
-    ctx->fs = sampleRate;
-    ctx->maxBlock = maxBlock;
-    ctx->tracks = tracks;
-    porta_params_t p = makeDefaultParams();
-    ctx->params.store(p, std::memory_order_relaxed);
+    float jitterDepthSamples = 0.0f;
+    if (std::isfinite(p.azimuthJitterMs) && p.azimuthJitterMs > 0.0f) {
+        jitterDepthSamples = static_cast<float>(ctx.sampleRate) * (p.azimuthJitterMs * 0.001f);
+    }
+    ctx.azimuth.setBaseOffsetSamples(0.0f);
+    ctx.azimuth.setJitterDepthSamples(jitterDepthSamples);
+    ctx.azimuth.setJitterRateHz(0.5f);
 
-    ctx->saturation.prepare(static_cast<float>(sampleRate), maxBlock);
-    ctx->headBump.prepare(static_cast<float>(sampleRate), maxBlock);
-    ctx->wowFlutter.prepare(static_cast<float>(sampleRate), maxBlock);
-    ctx->hiss.prepare(static_cast<float>(sampleRate), maxBlock);
-    ctx->hfLoss.prepare(static_cast<float>(sampleRate), maxBlock);
-    ctx->azimuth.prepare(static_cast<float>(sampleRate), maxBlock);
-    ctx->crosstalk.prepare(static_cast<float>(sampleRate), maxBlock);
-    ctx->dropouts.prepare(static_cast<float>(sampleRate), maxBlock);
-    ctx->compander.prepare(static_cast<float>(sampleRate), maxBlock);
-    ctx->eq.prepare(static_cast<float>(sampleRate), maxBlock);
-    ctx->meters.prepare(static_cast<float>(sampleRate), maxBlock);
-    ctx->meters.clear();
-
-    updateModuleParameters(ctx, p);
-
-    ctx->dsp.prepare(sampleRate, tracks);
-    ctx->currentParams = p;
-    ctx->rmsAcc.assign(8, 0.0f);
-    ctx->rmsCount.assign(8, 0);
-    int channels = tracks > 0 ? tracks : 1;
-    ctx->currentChannels = channels;
-    ctx->headBump.prepare(static_cast<float>(ctx->fs), channels);
-    ctx->headBump.setParams(p.headBumpFreqHz, p.headBumpGainDb);
-    ctx->hfLoss.prepare(static_cast<float>(ctx->fs), channels);
-    ctx->hiss.prepare(static_cast<float>(ctx->fs), channels);
-    ctx->azimuth.prepare(static_cast<float>(ctx->fs), ctx->maxBlock);
-    ctx->crosstalk.prepare(static_cast<float>(ctx->fs), ctx->maxBlock);
-    ctx->wowFlutter.resize(static_cast<size_t>(channels));
-    for (auto& wf : ctx->wowFlutter) {
-        wf.prepare(static_cast<float>(ctx->fs), ctx->maxBlock);
+    for (auto& wf : ctx.wowFlutter) {
         wf.setWowDepth(p.wowDepth);
         wf.setFlutterDepth(p.flutterDepth);
     }
-    ctx->saturation.prepare(static_cast<float>(ctx->fs), channels);
-    ctx->saturation.setDriveDb(p.satDriveDb);
-    ctx->channelScratch.resize(static_cast<size_t>(channels) * static_cast<size_t>(ctx->maxBlock));
+}
+
+void ensureChannelCapacity(PortaStubContext& ctx, int channels, int frames) {
+    if (ctx.currentChannels == channels) {
+        return;
+    }
+    ctx.currentChannels = channels;
+
+    ctx.headBump.prepare(static_cast<float>(ctx.sampleRate), channels);
+    ctx.saturation.prepare(static_cast<float>(ctx.sampleRate), channels);
+    ctx.hfLoss.prepare(static_cast<float>(ctx.sampleRate), channels);
+    ctx.hiss.prepare(static_cast<float>(ctx.sampleRate), channels);
+    ctx.wowFlutter.resize(static_cast<size_t>(channels));
+    for (auto& wf : ctx.wowFlutter) {
+        wf.prepare(static_cast<float>(ctx.sampleRate), ctx.maxBlock);
+    }
+    ctx.channelScratch.resize(static_cast<size_t>(channels) * static_cast<size_t>(frames));
+    ctx.rmsAcc.assign(static_cast<size_t>(channels), 0.0f);
+    ctx.rmsCount.assign(static_cast<size_t>(channels), 0);
+}
+
+void ensureFrameCapacity(PortaStubContext& ctx, int frames, int channels) {
+    if (ctx.channelScratch.size() < static_cast<size_t>(frames) * static_cast<size_t>(channels)) {
+        ctx.channelScratch.resize(static_cast<size_t>(frames) * static_cast<size_t>(channels));
+    }
+    if (ctx.tempLeft.size() < static_cast<size_t>(frames)) {
+        ctx.tempLeft.resize(static_cast<size_t>(frames));
+    }
+    if (ctx.tempRight.size() < static_cast<size_t>(frames)) {
+        ctx.tempRight.resize(static_cast<size_t>(frames));
+    }
+}
+
+} // namespace
+
+extern "C" {
+
+porta_dsp_handle porta_create(double sampleRate, int maxBlock, int tracks) {
+    auto* ctx = new PortaStubContext();
+    ctx->sampleRate = sampleRate > 1.0 ? sampleRate : 1.0;
+    ctx->maxBlock = std::max(maxBlock, 1);
+    ctx->maxTracks = std::max(tracks, 1);
+
+    porta_params_t defaults = makeDefaultParams();
+    ctx->params.store(defaults, std::memory_order_relaxed);
+    ctx->currentParams = defaults;
+
+    ctx->dsp.prepare(ctx->sampleRate, ctx->maxTracks);
+    ctx->headBump.prepare(static_cast<float>(ctx->sampleRate), ctx->maxTracks);
+    ctx->saturation.prepare(static_cast<float>(ctx->sampleRate), ctx->maxTracks);
+    ctx->hfLoss.prepare(static_cast<float>(ctx->sampleRate), ctx->maxTracks);
+    ctx->hiss.prepare(static_cast<float>(ctx->sampleRate), ctx->maxTracks);
+    ctx->azimuth.prepare(static_cast<float>(ctx->sampleRate), ctx->maxBlock);
+    ctx->crosstalk.prepare(static_cast<float>(ctx->sampleRate), ctx->maxBlock);
+
+    ctx->wowFlutter.resize(static_cast<size_t>(ctx->maxTracks));
+    for (auto& wf : ctx->wowFlutter) {
+        wf.prepare(static_cast<float>(ctx->sampleRate), ctx->maxBlock);
+    }
+
+    ctx->currentChannels = ctx->maxTracks;
+    ctx->channelScratch.resize(static_cast<size_t>(ctx->maxTracks) * static_cast<size_t>(ctx->maxBlock));
     ctx->tempLeft.resize(static_cast<size_t>(ctx->maxBlock));
     ctx->tempRight.resize(static_cast<size_t>(ctx->maxBlock));
-    float initialCutoff = p.lpfCutoffHz;
-    if (!std::isfinite(initialCutoff) || initialCutoff <= 0.0f) {
-        initialCutoff = static_cast<float>(ctx->fs) * 0.45f;
-    }
-    ctx->hfLoss.setCutoff(initialCutoff);
-    ctx->hiss.setLevelDbFS(p.hissLevelDbFS);
-    ctx->crosstalk.setAmountDb(p.crosstalkDb);
-    return (porta_dsp_handle)ctx;
+    ctx->rmsAcc.assign(static_cast<size_t>(ctx->maxTracks), 0.0f);
+    ctx->rmsCount.assign(static_cast<size_t>(ctx->maxTracks), 0);
+
+    updateModuleParameters(*ctx, defaults);
+    return reinterpret_cast<porta_dsp_handle>(ctx);
 }
 
 void porta_destroy(porta_dsp_handle h) {
-    auto* ctx = (PortaStubContext*)h;
+    auto* ctx = reinterpret_cast<PortaStubContext*>(h);
     delete ctx;
 }
 
 void porta_update_params(porta_dsp_handle h, const porta_params_t* p) {
-    auto* ctx = (PortaStubContext*)h;
+    if (!h || !p) {
+        return;
+    }
+    auto* ctx = reinterpret_cast<PortaStubContext*>(h);
     ctx->params.store(*p, std::memory_order_release);
 }
 
 void porta_process_interleaved(porta_dsp_handle h, float* interleaved, int frames, int channels) {
-    auto* ctx = (PortaStubContext*)h;
+    auto* ctx = reinterpret_cast<PortaStubContext*>(h);
     if (!ctx || !interleaved || frames <= 0 || channels <= 0) {
         return;
-    if (ctx == nullptr || inter == nullptr || frames <= 0 || ch <= 0) {
-        return;
     }
 
-    auto logStage = [](const char* stage, const char* suffix = "") {
-        std::fprintf(stderr, "[PortaDSP] Stage: %s%s\n", stage, suffix);
-    };
+    ensureChannelCapacity(*ctx, channels, frames);
+    ensureFrameCapacity(*ctx, frames, channels);
 
-    // Load latest params and (re)configure modules if needed.
-    porta_params_t p = ctx->params.load(std::memory_order_acquire);
-
-    if (ctx->currentChannels != ch) {
-        ctx->currentChannels = ch;
-        ctx->headBump.prepare(static_cast<float>(ctx->fs), ch);
-        ctx->hfLoss.prepare(static_cast<float>(ctx->fs), ch);
-        ctx->hiss.prepare(static_cast<float>(ctx->fs), ch);
-        ctx->saturation.prepare(static_cast<float>(ctx->fs), ch);
-        ctx->dsp.prepare(ctx->fs, ch);
-        ctx->wowFlutter.resize(static_cast<size_t>(ch));
-        for (auto& wf : ctx->wowFlutter) {
-            wf.prepare(static_cast<float>(ctx->fs), ctx->maxBlock);
-        }
-        ctx->channelScratch.resize(static_cast<size_t>(ch) * static_cast<size_t>(ctx->maxBlock));
-    }
-
-    if (ctx->tempLeft.size() < static_cast<size_t>(frames)) {
-        ctx->tempLeft.resize(static_cast<size_t>(frames));
-    }
-    if (ctx->tempRight.size() < static_cast<size_t>(frames)) {
-        ctx->tempRight.resize(static_cast<size_t>(frames));
-    }
-    if (ctx->channelScratch.size() < static_cast<size_t>(ch) * static_cast<size_t>(frames)) {
-        ctx->channelScratch.resize(static_cast<size_t>(ch) * static_cast<size_t>(frames));
-    }
-    if (ctx->rmsAcc.size() < static_cast<size_t>(ch)) {
-        ctx->rmsAcc.resize(static_cast<size_t>(ch), 0.0f);
-        ctx->rmsCount.resize(static_cast<size_t>(ch), 0);
-    }
-
-    ctx->headBump.setParams(p.headBumpFreqHz, p.headBumpGainDb);
-    ctx->saturation.setDriveDb(p.satDriveDb);
-    float cutoffHz = p.lpfCutoffHz;
-    if (!std::isfinite(cutoffHz) || cutoffHz <= 0.0f) {
-        cutoffHz = static_cast<float>(ctx->fs) * 0.45f;
-    }
-    ctx->hfLoss.setCutoff(cutoffHz);
-    ctx->hiss.setLevelDbFS(p.hissLevelDbFS);
-    ctx->crosstalk.setAmountDb(p.crosstalkDb);
-
-    float jitterDepthSamples = 0.0f;
-    if (std::isfinite(p.azimuthJitterMs) && p.azimuthJitterMs > 0.0f) {
-        jitterDepthSamples = static_cast<float>(ctx->fs) * (p.azimuthJitterMs * 0.001f);
-    }
-    ctx->azimuth.setBaseOffsetSamples(0.0f);
-    ctx->azimuth.setJitterDepthSamples(jitterDepthSamples);
-    ctx->azimuth.setJitterRateHz(0.5f);
-
-    for (auto& wf : ctx->wowFlutter) {
-        wf.setWowDepth(p.wowDepth);
-        wf.setFlutterDepth(p.flutterDepth);
-    }
-
-    ctx->currentParams = p;
+    porta_params_t params = ctx->params.load(std::memory_order_acquire);
+    updateModuleParameters(*ctx, params);
+    ctx->currentParams = params;
 
     DSPContext::Parameters dspParams;
-    dspParams.dropoutRatePerMin = p.dropoutRatePerMin;
-    dspParams.nrTrack4Bypass = p.nrTrack4Bypass != 0;
+    dspParams.dropoutRatePerMin = params.dropoutRatePerMin;
+    dspParams.nrTrack4Bypass = params.nrTrack4Bypass != 0;
+    ctx->dsp.process(interleaved, frames, channels, dspParams);
 
-    logStage("dropouts/compander");
-    ctx->dsp.process(inter, frames, ch, dspParams);
-
-    logStage("wow_flutter");
     if (!ctx->wowFlutter.empty()) {
-        size_t stride = static_cast<size_t>(frames);
-        for (int c = 0; c < ch; ++c) {
-            float* scratch = ctx->channelScratch.data() + static_cast<size_t>(c) * stride;
+        for (int c = 0; c < channels; ++c) {
+            float* scratch = ctx->channelScratch.data() + static_cast<size_t>(c) * static_cast<size_t>(frames);
             for (int i = 0; i < frames; ++i) {
-                scratch[i] = inter[i * ch + c];
+                scratch[i] = interleaved[i * channels + c];
             }
-            ctx->wowFlutter[static_cast<size_t>(c)].process(scratch, stride);
+            ctx->wowFlutter[static_cast<size_t>(c)].process(scratch, static_cast<std::size_t>(frames));
             for (int i = 0; i < frames; ++i) {
-                inter[i * ch + c] = scratch[i];
+                interleaved[i * channels + c] = scratch[i];
             }
         }
     }
 
-    logStage("head_bump");
     for (int frame = 0; frame < frames; ++frame) {
-        for (int c = 0; c < ch; ++c) {
-            int idx = frame * ch + c;
-            inter[idx] = ctx->headBump.processSample(inter[idx], c);
+        for (int c = 0; c < channels; ++c) {
+            const int idx = frame * channels + c;
+            interleaved[idx] = ctx->headBump.processSample(interleaved[idx], c);
         }
     }
 
-    logStage("saturation");
     ctx->saturation.startBlock(frames);
     for (int frame = 0; frame < frames; ++frame) {
-        for (int c = 0; c < ch; ++c) {
-            int idx = frame * ch + c;
-            inter[idx] = ctx->saturation.processSample(inter[idx]);
+        for (int c = 0; c < channels; ++c) {
+            const int idx = frame * channels + c;
+            interleaved[idx] = ctx->saturation.processSample(interleaved[idx]);
         }
     }
 
-    logStage("eq");
-    ctx->hfLoss.process(inter, frames, ch);
+    ctx->hfLoss.process(interleaved, frames, channels);
+    ctx->hiss.process(interleaved, frames, channels);
 
-    logStage("hiss");
-    ctx->hiss.process(inter, frames, ch);
-
-    bool hasStereo = ch >= 2;
-    logStage("crosstalk", hasStereo ? "" : " (skipped)");
-    if (hasStereo) {
+    if (channels >= 2) {
         for (int i = 0; i < frames; ++i) {
-            ctx->tempLeft[static_cast<size_t>(i)] = inter[i * ch + 0];
-            ctx->tempRight[static_cast<size_t>(i)] = inter[i * ch + 1];
+            ctx->tempLeft[static_cast<size_t>(i)] = interleaved[i * channels + 0];
+            ctx->tempRight[static_cast<size_t>(i)] = interleaved[i * channels + 1];
         }
         ctx->crosstalk.process(ctx->tempLeft.data(), ctx->tempRight.data(), frames);
-
-        logStage("azimuth");
         ctx->azimuth.process(ctx->tempLeft.data(), ctx->tempRight.data(), frames);
-
         for (int i = 0; i < frames; ++i) {
-            inter[i * ch + 0] = ctx->tempLeft[static_cast<size_t>(i)];
-            inter[i * ch + 1] = ctx->tempRight[static_cast<size_t>(i)];
+            interleaved[i * channels + 0] = ctx->tempLeft[static_cast<size_t>(i)];
+            interleaved[i * channels + 1] = ctx->tempRight[static_cast<size_t>(i)];
         }
-    } else {
-        logStage("azimuth", " (skipped)");
+    }
+
+    if (ctx->rmsAcc.size() < static_cast<size_t>(channels)) {
+        ctx->rmsAcc.resize(static_cast<size_t>(channels), 0.0f);
+        ctx->rmsCount.resize(static_cast<size_t>(channels), 0);
     }
 
     for (int frame = 0; frame < frames; ++frame) {
-        for (int c = 0; c < ch; ++c) {
-            int idx = frame * ch + c;
-            float sample = inter[idx];
+        for (int c = 0; c < channels; ++c) {
+            const int idx = frame * channels + c;
+            const float sample = interleaved[idx];
             ctx->rmsAcc[static_cast<size_t>(c)] += sample * sample;
             ctx->rmsCount[static_cast<size_t>(c)] += 1;
         }
     }
-
-    porta_params_t params = ctx->params.load(std::memory_order_acquire);
-    updateModuleParameters(ctx, params);
-
-    ctx->wowFlutter.processBlock(interleaved, frames, channels);
-    ctx->headBump.processBlock(interleaved, frames, channels);
-    ctx->eq.processBlock(interleaved, frames, channels);
-    ctx->saturation.processBlock(interleaved, frames, channels);
-    ctx->hfLoss.processBlock(interleaved, frames, channels);
-    ctx->crosstalk.processBlock(interleaved, frames, channels);
-    ctx->dropouts.processBlock(interleaved, frames, channels);
-    ctx->hiss.processBlock(interleaved, frames, channels);
-    ctx->meters.processBlock(interleaved, frames, channels);
 }
 
 int porta_get_meters_dbfs(porta_dsp_handle h, float* outDbfs, int maxChannels) {
-    auto* ctx = (PortaStubContext*)h;
+    auto* ctx = reinterpret_cast<PortaStubContext*>(h);
     if (!ctx || !outDbfs || maxChannels <= 0) {
         return 0;
     }
 
-    int available = std::min(maxChannels, ctx->meters.channels());
+    const int available = std::min<int>(maxChannels, static_cast<int>(ctx->rmsAcc.size()));
     for (int i = 0; i < available; ++i) {
-        outDbfs[i] = ctx->meters.rmsDb(i);
-    int n = std::min(maxCh, (int)ctx->rmsAcc.size());
-    for (int i = 0; i < n; i++) {
         float rms = 0.0f;
-        if (ctx->rmsCount[i] > 0) {
-            rms = std::sqrt(ctx->rmsAcc[i] / (float)ctx->rmsCount[i]);
+        if (ctx->rmsCount[static_cast<size_t>(i)] > 0) {
+            rms = std::sqrt(ctx->rmsAcc[static_cast<size_t>(i)] /
+                            static_cast<float>(ctx->rmsCount[static_cast<size_t>(i)]));
         }
-        // reset accumulators
-        ctx->rmsAcc[i] = 0.0f;
-        ctx->rmsCount[i] = 0;
-        float db = (rms > 1e-9f) ? 20.0f * std::log10(rms) : -120.0f;
-        outDbfs[i] = db;
+        ctx->rmsAcc[static_cast<size_t>(i)] = 0.0f;
+        ctx->rmsCount[static_cast<size_t>(i)] = 0;
+        outDbfs[i] = rms > 1.0e-9f ? 20.0f * std::log10(rms) : -120.0f;
     }
-    ctx->meters.clear();
     return available;
 }
 
 float porta_test_saturation(float sample, float driveDb) {
-    Saturation s;
-    s.prepare(48000.0f, 1);
-    s.setDriveDb(driveDb);
-    float value = sample;
-    s.processBlock(&value, 1, 1);
-    return value;
+    SaturationStage stage;
+    stage.prepare(48000.0f, 1);
+    stage.setDriveDb(driveDb);
+    stage.startBlock(1);
+    return stage.processSample(sample);
 }
 
 void porta_test_head_bump(const float* input, float* output, int frames, float sampleRate, float gainDb, float freqHz) {
     if (!input || !output || frames <= 0) {
         return;
     }
-    HeadBump hb;
-    hb.prepare(sampleRate, frames);
-    hb.setGainDb(gainDb);
-    hb.setFrequency(freqHz);
-    std::memcpy(output, input, sizeof(float) * frames);
-    hb.processBlock(output, frames, 1);
+    HeadBump headBump;
+    headBump.prepare(sampleRate, 1);
+    headBump.setParams(freqHz, gainDb);
+    for (int i = 0; i < frames; ++i) {
+        output[i] = headBump.processSample(input[i], 0);
+    }
 }
 
-void porta_test_wow_flutter(const float* input, float* output, int frames, float sampleRate, float wowDepth, float flutterDepth, float wowRate, float flutterRate) {
+void porta_test_wow_flutter(const float* input, float* output, int frames, float sampleRate, float wowDepth, float flutterDepth,
+                             float wowRate, float flutterRate) {
     if (!input || !output || frames <= 0) {
         return;
     }
@@ -493,11 +403,13 @@ void porta_test_wow_flutter(const float* input, float* output, int frames, float
     wf.setFlutterDepth(flutterDepth);
     wf.setWowRate(wowRate);
     wf.setFlutterRate(flutterRate);
-    std::memcpy(output, input, sizeof(float) * frames);
-    wf.processBlock(output, frames, 1);
+    for (int i = 0; i < frames; ++i) {
+        output[i] = wf.processSample(input[i]);
+    }
 }
 
-void porta_test_apply_dropouts(float* interleaved, int frames, int channels, float sampleRate, float dropoutRatePerMin, int dropoutLengthSamples, uint32_t seed) {
+void porta_test_apply_dropouts(float* interleaved, int frames, int channels, float sampleRate, float dropoutRatePerMin,
+                               int dropoutLengthSamples, uint32_t seed) {
     if (!interleaved || frames <= 0 || channels <= 0 || dropoutLengthSamples <= 0) {
         return;
     }
@@ -509,3 +421,5 @@ void porta_test_apply_dropouts(float* interleaved, int frames, int channels, flo
     dropouts.setHoldRangeSamplesForTesting(dropoutLengthSamples, dropoutLengthSamples);
     dropouts.process(interleaved, frames, channels);
 }
+
+} // extern "C"
