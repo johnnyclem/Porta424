@@ -2,50 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
-#include "module.h"
-
-class Azimuth : public Module {
-public:
-    void prepare(float sampleRate, int maxBlockSize) override {
-        (void)sampleRate;
-        (void)maxBlockSize;
-        updateMatrix();
-    }
-
-    void setAngleDegrees(float degrees) {
-        angleDegrees = degrees;
-        updateMatrix();
-    }
-
-    void setDepth(float d) {
-        depth = std::clamp(d, 0.0f, 1.0f);
-        updateMatrix();
-    }
-
-    void reset() override {
-        updateMatrix();
-    }
-
-    void processBlock(float* interleavedBuffer, int numFrames, int numChannels) override {
-        if (!interleavedBuffer || numFrames <= 0 || numChannels < 2) {
-            return;
-        }
-
-        for (int i = 0; i < numFrames; ++i) {
-            float* left = &interleavedBuffer[i * numChannels];
-            float* right = &interleavedBuffer[i * numChannels + 1];
-            float l = *left;
-            float r = *right;
-            float newL = matrix00 * l + matrix01 * r;
-            float newR = matrix10 * l + matrix11 * r;
-            *left = newL;
-            *right = newR;
 #include <vector>
 
-/**
- * Models azimuth jitter between two playback heads by introducing a tiny,
- * time-varying difference in delay between the left and right channels.
- */
 class Azimuth {
 public:
     void prepare(float newSampleRate, int maxBlockSize)
@@ -105,24 +63,6 @@ public:
     }
 
 private:
-    float angleDegrees{0.0f};
-    float depth{1.0f};
-    float matrix00{1.0f};
-    float matrix01{0.0f};
-    float matrix10{0.0f};
-    float matrix11{1.0f};
-
-    void updateMatrix() {
-        const float radians = angleDegrees * static_cast<float>(M_PI) / 180.0f;
-        const float c = std::cos(radians);
-        const float s = std::sin(radians) * depth;
-        matrix00 = c;
-        matrix01 = s;
-        matrix10 = -s;
-        matrix11 = c;
-    }
-};
-
     void updateBuffers()
     {
         const int delay = static_cast<int>(std::ceil(baseOffsetSamples + jitterDepthSamples)) + 4;
@@ -152,7 +92,7 @@ private:
             return 0.0f;
 
         const float maxDelay = static_cast<float>(delayBufferSize - 1);
-        const float safeDelay = std::max(0.0f, std::min(delaySamples, maxDelay));
+        const float safeDelay = std::clamp(delaySamples, 0.0f, maxDelay);
         float readPos = static_cast<float>(writeIndex) - safeDelay;
         while (readPos < 0.0f)
             readPos += static_cast<float>(delayBufferSize);
