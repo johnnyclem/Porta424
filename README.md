@@ -76,6 +76,12 @@ open Examples/AVEngineDemo/AVEngineDemo.xcodeproj
 
 Run the macOS target from Xcode, select a microphone input, and you should hear the effected output routed through the default device.
 
+## Preset format & compatibility
+
+`PortaDSPKit` ships with a codable `PortaPreset` struct that captures a full `PortaDSP.Params` snapshot together with light metadata. Presets are encoded as JSON and tagged with a `formatVersion` field; the current schema version is `1`, and presets report compatibility via `isCompatible()`. Factory content is bundled inside the library and exposed to hosts through `AUAudioUnitPreset`, covering "Clean Cassette", "Warm Bump", "Crunchy Saturation", "Wobbly Lo-Fi", and "Noisy VHS" styles.
+
+The AVEngine demo app persists user presets by serializing `PortaPreset` instances to `.portapreset` files under the user's Application Support directory (falling back to Documents or temporary storage on platforms where Application Support is unavailable). Saved presets load across launches and can be re-applied alongside the factory set.
+
 ## Running tests on macOS
 
 From the repository root:
