@@ -10,11 +10,12 @@ final class SaturationTests: XCTestCase {
         let driveValues: [Float] = [-12, 0, 12, 24]
 
         var previousRMS: Double?
+        var maxObservedTHD: Double = 0
         var thdValues: [Double] = []
 
         for drive in driveValues {
             let dsp = PortaDSP(sampleRate: sampleRate, maxBlock: frames, tracks: 1)
-            var params = PortaDSP.Params()
+            var params = PortaDSP.Params.zeroed()
             params.satDriveDb = drive
             params.dropoutRatePerMin = 0.0
             params.headBumpGainDb = 0.0
@@ -50,6 +51,8 @@ final class SaturationTests: XCTestCase {
             let highDriveTHD = thdValues[3]    // corresponds to +24 dB
             XCTAssertGreaterThan(highDriveTHD, mediumDriveTHD, "Highest drive should introduce more THD than moderate drive")
         }
+
+        XCTAssertGreaterThan(maxObservedTHD, 0.1, "Saturation should introduce measurable distortion")
     }
 
     private func analyzeSignal(_ buffer: [Float], sampleRate: Double, frequency: Double) -> (rms: Double, thd: Double) {

@@ -35,10 +35,24 @@ final class MeterTests: XCTestCase {
         let meters = dsp.readMeters()
         XCTAssertGreaterThanOrEqual(meters.count, channels)
 
+        var perChannelRMS = [Double](repeating: 0.0, count: channels)
+        for frame in 0..<frames {
+            for channel in 0..<channels {
+                let index = frame * channels + channel
+                let sample = Double(buffer[index])
+                perChannelRMS[channel] += sample * sample
+            }
+        }
+
+        let expectedDb = perChannelRMS.map { rmsAccumulator -> Float in
+            guard rmsAccumulator > 0 else { return -120.0 }
+            let rms = sqrt(rmsAccumulator / Double(frames))
+            return Float(20.0 * log10(rms))
+        }
         let tolerance: Float = 1.0
 
         for channel in 0..<channels {
-            XCTAssertEqual(meters[channel], rmsDb(for: channel), accuracy: tolerance, "Channel \(channel) meter should reflect RMS level")
+            XCTAssertEqual(meters[channel], expectedDb[channel], accuracy: tolerance, "Channel \(channel) meter should reflect RMS level")
         }
 
         let resetMeters = dsp.readMeters()
