@@ -26,6 +26,12 @@ final class AudioEngineManager: ObservableObject {
     @Published private(set) var currentPresetName: String
     @Published private(set) var userPresets: [PortaPreset]
     @Published private(set) var meters: [Float] = Array(repeating: AudioEngineManager.meterFloor, count: 2)
+    @Published var params: PortaDSP.Params {
+        didSet {
+            applyParameters()
+            savePreset()
+        }
+    }
     @Published var satDriveDb: Float = -6.0 {
         didSet {
             currentParams.satDriveDb = satDriveDb
@@ -65,10 +71,19 @@ final class AudioEngineManager: ObservableObject {
     private var displayLink: CADisplayLink?
     #else
     private var meterTimer: Timer?
+    private let presetURL: URL
     #endif
 
     static let meterFloor: Float = -120.0
     private static let smoothingFactor: Float = 0.25
+    private static let presetFilename = "PortaDSPPreset.json"
+
+    init() {
+        let url = AudioEngineManager.defaultPresetURL()
+        presetURL = url
+        let initialParams = AudioEngineManager.loadPreset(from: url) ?? PortaDSP.Params()
+        _params = Published(initialValue: initialParams)
+    }
 
     init(presetStore: PortaPresetStore = PortaPresetStore()) {
         self.presetStore = presetStore
@@ -186,6 +201,7 @@ final class AudioEngineManager: ObservableObject {
         let (node, dsp) = try await installDSPNode()
         avUnit = node
         dspUnit = dsp
+        applyParameters()
         applyPendingParametersToDSP()
         currentParams.satDriveDb = satDriveDb
         currentParams.headBumpGainDb = headBumpGainDb
@@ -336,6 +352,48 @@ final class AudioEngineManager: ObservableObject {
     }
 
     private func applyParameters() {
+        dspUnit?.updateParameters(params)
+    }
+
+    private func savePreset() {
+        do {
+            let data = try params.toJSON(prettyPrinted: true)
+            try ensurePresetDirectoryExists()
+            try data.write(to: presetURL, options: .atomic)
+        } catch {
+            #if DEBUG
+            print("Failed to save PortaDSP preset: \(error)")
+            #endif
+        }
+    }
+
+    private func ensurePresetDirectoryExists() throws {
+        let directory = presetURL.deletingLastPathComponent()
+        if !FileManager.default.fileExists(atPath: directory.path) {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+    }
+
+    private static func defaultPresetURL() -> URL {
+        let fm = FileManager.default
+        let baseDirectory: URL
+        if let support = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            baseDirectory = support
+        } else if let documents = fm.urls(for: .documentDirectory, in: .userDomainMask).first {
+            baseDirectory = documents
+        } else {
+            baseDirectory = fm.temporaryDirectory
+        }
+        return baseDirectory
+            .appendingPathComponent("PortaDSP", isDirectory: true)
+            .appendingPathComponent(presetFilename)
+    }
+
+    private static func loadPreset(from url: URL) -> PortaDSP.Params? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? PortaDSP.Params(fromJSON: data)
+    }
+}
         guard let dspUnit else { return }
         dspUnit.updateParameters(currentParams)
     }
