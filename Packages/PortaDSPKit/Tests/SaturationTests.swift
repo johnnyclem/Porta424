@@ -11,11 +11,14 @@ final class SaturationTests: XCTestCase {
 
         var previousRMS: Double?
         var maxObservedTHD: Double = 0
+        var thdValues: [Double] = []
 
         for drive in driveValues {
             let dsp = PortaDSP(sampleRate: sampleRate, maxBlock: frames, tracks: 1)
             var params = PortaDSP.Params.zeroed()
             params.satDriveDb = drive
+            params.dropoutRatePerMin = 0.0
+            params.headBumpGainDb = 0.0
             dsp.update(params)
 
             var settle = [Float](repeating: 0, count: 256)
@@ -29,15 +32,24 @@ final class SaturationTests: XCTestCase {
 
             let metrics = analyzeSignal(buffer, sampleRate: sampleRate, frequency: frequency)
 
-            XCTAssertTrue(metrics.thd.isFinite, "THD should remain finite")
-            XCTAssertTrue(metrics.rms.isFinite, "RMS should remain finite")
-
-            if let priorRMS = previousRMS {
-                XCTAssertGreaterThan(metrics.rms, priorRMS * 0.95, "Output RMS should not collapse as drive increases")
+            if let previous = previousRMS {
+                XCTAssertGreaterThanOrEqual(metrics.rms, previous * 0.999, "Output RMS should not decrease as drive increases")
             }
             previousRMS = metrics.rms
+            thdValues.append(metrics.thd)
+        }
 
-            maxObservedTHD = max(maxObservedTHD, metrics.thd)
+        guard let minTHD = thdValues.min(), let maxTHD = thdValues.max() else {
+            XCTFail("Failed to collect THD measurements")
+            return
+        }
+
+        XCTAssertGreaterThan(maxTHD - minTHD, 0.1, "THD should vary meaningfully with drive settings")
+
+        if thdValues.count >= 3 {
+            let mediumDriveTHD = thdValues[2] // corresponds to +12 dB
+            let highDriveTHD = thdValues[3]    // corresponds to +24 dB
+            XCTAssertGreaterThan(highDriveTHD, mediumDriveTHD, "Highest drive should introduce more THD than moderate drive")
         }
 
         XCTAssertGreaterThan(maxObservedTHD, 0.1, "Saturation should introduce measurable distortion")

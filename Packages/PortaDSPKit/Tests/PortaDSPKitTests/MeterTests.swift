@@ -13,10 +13,24 @@ final class MeterTests: XCTestCase {
         let channels = 2
         var buffer = [Float](repeating: 0.25, count: frames * channels)
 
-        let params = PortaDSP.Params.zeroed()
+        var params = PortaDSP.Params()
+        params.dropoutRatePerMin = 0.0
+        params.headBumpGainDb = 0.0
+        params.satDriveDb = 0.0
         dsp.update(params)
 
         dsp.processInterleaved(buffer: &buffer, frames: frames, channels: channels)
+
+        func rmsDb(for channel: Int) -> Float {
+            var sum: Double = 0.0
+            for frame in 0..<frames {
+                let sample = buffer[frame * channels + channel]
+                sum += Double(sample * sample)
+            }
+            let mean = sum / Double(frames)
+            let rms = sqrt(mean)
+            return rms > 1.0e-9 ? Float(20.0 * log10(rms)) : -120.0
+        }
 
         let meters = dsp.readMeters()
         XCTAssertGreaterThanOrEqual(meters.count, channels)

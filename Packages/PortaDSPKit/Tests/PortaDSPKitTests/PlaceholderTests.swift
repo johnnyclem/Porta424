@@ -23,6 +23,26 @@ final class PlaceholderTests: XCTestCase {
         }
     }
 
+    func testJSONRoundTrip() throws {
+        var generator = SeededGenerator(seed: 0xABCDEF12)
+        for _ in 0..<50 {
+            let original = PortaDSP.Params.randomized(using: &generator)
+            let data = try original.toJSON()
+            let decoded = try PortaDSP.Params(fromJSON: data)
+            XCTAssertEqual(decoded.wowDepth, original.wowDepth)
+            XCTAssertEqual(decoded.flutterDepth, original.flutterDepth)
+            XCTAssertEqual(decoded.headBumpGainDb, original.headBumpGainDb)
+            XCTAssertEqual(decoded.headBumpFreqHz, original.headBumpFreqHz)
+            XCTAssertEqual(decoded.satDriveDb, original.satDriveDb)
+            XCTAssertEqual(decoded.hissLevelDbFS, original.hissLevelDbFS)
+            XCTAssertEqual(decoded.lpfCutoffHz, original.lpfCutoffHz)
+            XCTAssertEqual(decoded.azimuthJitterMs, original.azimuthJitterMs)
+            XCTAssertEqual(decoded.crosstalkDb, original.crosstalkDb)
+            XCTAssertEqual(decoded.dropoutRatePerMin, original.dropoutRatePerMin)
+            XCTAssertEqual(decoded.nrTrack4Bypass, original.nrTrack4Bypass)
+        }
+    }
+
     private func assertBridgeMatches(_ params: PortaDSP.Params, file: StaticString = #filePath, line: UInt = #line) {
         let cStruct = params.makeCParams()
 
