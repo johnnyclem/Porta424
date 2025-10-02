@@ -16,7 +16,8 @@ final class PortaDSPAudioUnitRenderTests: XCTestCase {
                     channels: channels,
                     frames: frames,
                     interleaved: true,
-                    bypass: false
+                    bypass: false,
+                    offline: false
                 )
             }
         }
@@ -30,18 +31,39 @@ final class PortaDSPAudioUnitRenderTests: XCTestCase {
                     channels: channels,
                     frames: frames,
                     interleaved: false,
-                    bypass: false
+                    bypass: false,
+                    offline: false
                 )
             }
         }
     }
 
     func testBypassLeavesInterleavedBufferUnmodified() throws {
-        try assertRenderMatchesExpected(channels: 2, frames: 16, interleaved: true, bypass: true)
+        try assertRenderMatchesExpected(channels: 2, frames: 16, interleaved: true, bypass: true, offline: false)
     }
 
     func testBypassLeavesPlanarBufferUnmodified() throws {
-        try assertRenderMatchesExpected(channels: 2, frames: 16, interleaved: false, bypass: true)
+        try assertRenderMatchesExpected(channels: 2, frames: 16, interleaved: false, bypass: true, offline: false)
+    }
+
+    func testOfflineInterleavedRenderingMatchesExpectedSamples() throws {
+        try assertRenderMatchesExpected(
+            channels: 2,
+            frames: 32,
+            interleaved: true,
+            bypass: false,
+            offline: true
+        )
+    }
+
+    func testOfflinePlanarRenderingMatchesExpectedSamples() throws {
+        try assertRenderMatchesExpected(
+            channels: 2,
+            frames: 31,
+            interleaved: false,
+            bypass: false,
+            offline: true
+        )
     }
 
     func testMaximumFramesToRenderAndTooManyFramesError() throws {
@@ -92,7 +114,13 @@ final class PortaDSPAudioUnitRenderTests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func assertRenderMatchesExpected(channels: Int, frames: Int, interleaved: Bool, bypass: Bool) throws {
+    private func assertRenderMatchesExpected(
+        channels: Int,
+        frames: Int,
+        interleaved: Bool,
+        bypass: Bool,
+        offline: Bool
+    ) throws {
         let unit = try makeConfiguredUnit(channels: channels, interleaved: interleaved, maximumFrames: AUAudioFrameCount(max(frames, 1)))
         defer { unit.deallocateRenderResources() }
         unit.shouldBypassEffect = bypass
@@ -101,14 +129,22 @@ final class PortaDSPAudioUnitRenderTests: XCTestCase {
         var buffers = makeAudioBufferList(frames: frames, channels: channels, interleaved: interleaved)
         defer { deallocateAudioBufferList(&buffers, interleaved: interleaved, frames: frames, channels: channels) }
 
-        let pullBlock: AURenderPullInputBlock = { _, _, frameCount, busNumber, data in
+        let pullBlock: AURenderPullInputBlock = { flags, _, frameCount, busNumber, data in
+            if offline {
+                XCTAssertNotNil(flags, "Offline rendering should provide action flags")
+                if let flags {
+                    XCTAssertTrue(flags.pointee.contains(.offline))
+                }
+            } else if let flags {
+                XCTAssertFalse(flags.pointee.contains(.offline))
+            }
             XCTAssertEqual(Int(frameCount), frames)
             XCTAssertEqual(busNumber, 0)
             self.write(samples: samples, to: data, interleaved: interleaved, frames: frames, channels: channels)
             return noErr
         }
 
-        var flags: AudioUnitRenderActionFlags = []
+        var flags: AudioUnitRenderActionFlags = offline ? [.offline] : []
         var timestamp = AudioTimeStamp()
         let status = withUnsafePointer(to: &timestamp) { tsPtr in
             unit.internalRenderBlock(&flags, tsPtr, AUAudioFrameCount(frames), 0, buffers.unsafeMutablePointer, nil, pullBlock)

@@ -36,6 +36,11 @@ let package = Package(
             name: "PortaDSPKitTests",
             dependencies: ["PortaDSPKit"],
             path: "Packages/PortaDSPKit/Tests"
+        ),
+        .testTarget(
+            name: "PortaDSPPerformanceTests",
+            dependencies: ["PortaDSPKit"],
+            path: "Packages/PortaDSPKit/PerformanceTests"
         )
     ],
     cxxLanguageStandard: .cxx17
