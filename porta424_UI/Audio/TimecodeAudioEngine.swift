@@ -20,6 +20,7 @@ class TimecodeAudioEngine: ObservableObject {
     @Published var trackLevels: [Float] = [0, 0, 0, 0]   // 0.0 – 1.2
     @Published var dolbyBEnabled: [Bool] = [false, false, false, false]
     @Published var trackGains: [Float] = [1.0, 1.0, 1.0, 1.0]
+    @Published var controlKnobs: [Double] = [0.6, 0.4, 0.5, 0.3]
     
     // Timecode / Tape
     @Published var elapsedSeconds: Int = 0 // 0...tapeLengthSeconds
@@ -343,4 +344,3 @@ class TimecodeAudioEngine: ObservableObject {
         // In real app: insert DolbyBProcessor node
     }
 }
-

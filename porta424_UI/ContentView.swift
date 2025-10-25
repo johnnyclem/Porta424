@@ -11,7 +11,7 @@ import SwiftUI
 struct Porta424App: App {
     var body: some Scene {
         WindowGroup {
-            TapeDeckView()
+            Porta424RootView()
         }
     }
 }
