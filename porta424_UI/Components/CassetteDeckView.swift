@@ -9,16 +9,6 @@ struct CassetteDeckView: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(PortaTheme.wood)
-                .frame(height: 22)
-                .overlay(alignment: .trailing) {
-                    Circle()
-                        .fill(Color.black.opacity(0.3))
-                        .frame(width: 6, height: 6)
-                        .padding(.trailing, 8)
-                }
-
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(
@@ -40,11 +30,11 @@ struct CassetteDeckView: View {
                         .frame(height: 28)
                         .overlay(
                             HStack {
-                                Text("V.N")
+                                Text("TASCAM")
                                     .font(.system(size: 14, weight: .semibold, design: .rounded))
                                 Spacer()
                                 Image(systemName: "triangle.fill")
-                                    .scaleEffect(x: 1.4, y: 0.9)
+                                    .scaleEffect(x: 1.2, y: 0.9)
                                     .foregroundStyle(PortaTheme.red)
                             }
                             .padding(.horizontal, 10)

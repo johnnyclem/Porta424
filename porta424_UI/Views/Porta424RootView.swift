@@ -89,6 +89,20 @@ struct Porta424RootView: View {
                     audio.play()
                 }
                 TransportPadButton(
+                    icon: "pause.fill",
+                    label: "PAUSE",
+                    isActive: audio.transportState == .pausedPlayback || audio.transportState == .pausedRecording
+                ) {
+                    audio.pause()
+                }
+                TransportPadButton(
+                    icon: "forward.fill",
+                    label: "FF",
+                    isActive: audio.transportState == .fastForward
+                ) {
+                    audio.fastForward()
+                }
+                TransportPadButton(
                     icon: "record.circle.fill",
                     label: "REC",
                     tint: PortaTheme.red,
