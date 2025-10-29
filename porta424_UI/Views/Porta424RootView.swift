@@ -53,11 +53,11 @@ struct Porta424RootView: View {
 
     private var tapeDeckCard: some View {
         PortaCard {
-            VStack(spacing: 14) {
-                CassetteDeckView(isPlaying: cassetteIsMoving, progress: cassetteProgress)
-                    .frame(minHeight: 140, maxHeight: 210)
+            VStack(spacing: 12) {
+                TapeDeckView(mode: .compact)
+                    .frame(minHeight: 180)
             }
-            .padding(16)
+            .padding(8)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Tape Deck")
@@ -73,6 +73,8 @@ struct Porta424RootView: View {
                 ) {
                     audio.rewind()
                 }
+                .disabled(audio.transportState == .playing || audio.transportState == .recording || audio.transportState == .pausedPlayback || audio.transportState == .pausedRecording)
+                
                 TransportPadButton(
                     icon: "stop.fill",
                     label: "STOP",
@@ -80,6 +82,7 @@ struct Porta424RootView: View {
                 ) {
                     audio.stop()
                 }
+                
                 TransportPadButton(
                     icon: "play.fill",
                     label: "PLAY",
@@ -88,6 +91,8 @@ struct Porta424RootView: View {
                 ) {
                     audio.play()
                 }
+                .disabled(audio.transportState == .recording || audio.transportState == .fastForward || audio.transportState == .rewinding || audio.transportState == .pausedRecording)
+                
                 TransportPadButton(
                     icon: "pause.fill",
                     label: "PAUSE",
@@ -95,6 +100,7 @@ struct Porta424RootView: View {
                 ) {
                     audio.pause()
                 }
+                
                 TransportPadButton(
                     icon: "forward.fill",
                     label: "FF",
@@ -102,6 +108,8 @@ struct Porta424RootView: View {
                 ) {
                     audio.fastForward()
                 }
+                .disabled(audio.transportState == .playing || audio.transportState == .recording || audio.transportState == .pausedPlayback || audio.transportState == .pausedRecording)
+                
                 TransportPadButton(
                     icon: "record.circle.fill",
                     label: "REC",
@@ -111,6 +119,7 @@ struct Porta424RootView: View {
                 ) {
                     audio.record()
                 }
+                .disabled(audio.transportState == .fastForward || audio.transportState == .rewinding || audio.transportState == .pausedPlayback)
             }
             .padding(4)
         }

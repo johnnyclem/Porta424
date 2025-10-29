@@ -8,6 +8,8 @@
 import SwiftUI
 import Combine
 
+enum TapeDeckMode { case full, compact }
+
 // MARK: - CassetteTapeView (compact, portrait-friendly)
 private struct CassetteTapeView: View {
     let rotation: Double
@@ -102,6 +104,7 @@ private struct CassetteTapeView: View {
 }
 
 struct TapeDeckView: View {
+    let mode: TapeDeckMode
     @ObservedObject private var audio = TimecodeAudioEngine.shared
     @State private var reelRotation: Double = 0
 
@@ -110,9 +113,13 @@ struct TapeDeckView: View {
     // MARK: - Layout helpers
     private var horizontalPadding: CGFloat { 16 }
 
+    init(mode: TapeDeckMode = .full) { self.mode = mode }
+
     var body: some View {
         ZStack {
-            PortaColor.background.ignoresSafeArea()
+            if mode == .full {
+                PortaColor.background.ignoresSafeArea()
+            }
 
             VStack(spacing: 12) {
                 // Cassette Header
@@ -124,7 +131,7 @@ struct TapeDeckView: View {
 
                 // Timecode / State row
                 HStack(alignment: .lastTextBaseline) {
-                    Text(audio.displayTimecode)
+                    Text("\(audio.currentTapeTimecode)")
                         .font(.system(size: 28, weight: .heavy, design: .monospaced))
                         .foregroundStyle(.white)
                         .opacity(0.9)
@@ -138,48 +145,50 @@ struct TapeDeckView: View {
                 }
                 .padding(.horizontal, horizontalPadding)
 
-                // Faders 2x2 grid (portrait-optimized)
-                Grid(alignment: .center, horizontalSpacing: 18, verticalSpacing: 8) {
-                    GridRow {
-                        fader(index: 0)
-                        fader(index: 1)
+                if mode == .full {
+                    // Faders 2x2 grid (portrait-optimized)
+                    Grid(alignment: .center, horizontalSpacing: 18, verticalSpacing: 8) {
+                        GridRow {
+                            fader(index: 0)
+                            fader(index: 1)
+                        }
+                        GridRow {
+                            fader(index: 2)
+                            fader(index: 3)
+                        }
                     }
-                    GridRow {
-                        fader(index: 2)
-                        fader(index: 3)
+                    .padding(.horizontal, horizontalPadding)
+                    .padding(.top, 4)
+
+                    // VU Meters row
+                    HStack(spacing: 12) {
+                        ForEach(0..<4) { i in
+                            VUMeter(level: CGFloat(audio.trackLevels[i]))
+                        }
                     }
+                    .frame(height: 80)
+                    .padding(.horizontal, horizontalPadding)
+
+                    Spacer(minLength: 8)
+
+                    // Transport with prominent Record
+                    TransportBar(
+                        isPlaying: $audio.isPlaying,
+                        isRecording: $audio.isRecording,
+                        transportState: $audio.transportState,
+                        isPaused: $audio.isPaused,
+                        onRewind: { audio.rewind() },
+                        onFastForward: { audio.fastForward() },
+                        onPlay: { audio.play() },
+                        onPause: { audio.pause() },
+                        onStop: { audio.stop() },
+                        onRecord: { audio.record() }
+                    )
+                    .padding(.horizontal, horizontalPadding)
+                    .padding(.bottom, 8)
                 }
-                .padding(.horizontal, horizontalPadding)
-                .padding(.top, 4)
-
-                // VU Meters row
-                HStack(spacing: 12) {
-                    ForEach(0..<4) { i in
-                        VUMeter(level: CGFloat(audio.trackLevels[i]))
-                    }
-                }
-                .frame(height: 80)
-                .padding(.horizontal, horizontalPadding)
-
-                Spacer(minLength: 8)
-
-                // Transport with prominent Record
-                TransportBar(
-                    isPlaying: $audio.isPlaying,
-                    isRecording: $audio.isRecording,
-                    transportState: $audio.transportState,
-                    isPaused: $audio.isPaused,
-                    onRewind: { audio.rewind() },
-                    onFastForward: { audio.fastForward() },
-                    onPlay: { audio.play() },
-                    onPause: { audio.pause() },
-                    onStop: { audio.stop() },
-                    onRecord: { audio.record() }
-                )
-                .padding(.horizontal, horizontalPadding)
-                .padding(.bottom, 8)
             }
-            .padding(.top, 8)
+            .padding(.top, mode == .full ? 8 : 0)
         }
     }
 
@@ -234,6 +243,6 @@ struct TapeDeckView: View {
 
 // MARK: - Preview
 #Preview {
-    TapeDeckView()
+    TapeDeckView(mode: .full)
         .preferredColorScheme(.dark)
 }
