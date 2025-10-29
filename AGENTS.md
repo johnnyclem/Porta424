@@ -23,3 +23,40 @@ Recent history favors short, present-tense subjects (“adds readme”, “initi
 
 ## Asset & Audio Handling
 Keep large reference audio files out of the repository; rely on small loops under `Audio/` for demos and document any external downloads. When adding new assets, note licensing in the PR and ensure filenames stay lowercase with hyphens (`play-button.pdf`) to avoid asset catalog merge conflicts.
+
+
+
+## Other branches to reference that need to be reviewed and merged in if appropriate:
+ * [new branch]      codex/add-auparametertree-for-portadspaudiounit      -> origin/codex/add-auparametertree-for-portadspaudiounit
+ * [new branch]      codex/add-avaudioengine-helper-and-example           -> origin/codex/add-avaudioengine-helper-and-example
+ * [new branch]      codex/add-continuous-fuzz-testing-support            -> origin/codex/add-continuous-fuzz-testing-support
+ * [new branch]      codex/add-cross-platform-guards-for-audiotoolbox     -> origin/codex/add-cross-platform-guards-for-audiotoolbox
+ * [new branch]      codex/add-crosstalk-and-azimuth-jitter-simulation    -> origin/codex/add-crosstalk-and-azimuth-jitter-simulation
+ * [new branch]      codex/add-dropout-and-compander-features             -> origin/codex/add-dropout-and-compander-features
+ * [new branch]      codex/add-dsp-passthrough-c-stub                     -> origin/codex/add-dsp-passthrough-c-stub
+ * [new branch]      codex/add-factory-presets-feature                    -> origin/codex/add-factory-presets-feature
+ * [new branch]      codex/add-macos-latest-job-to-ci-pipeline            -> origin/codex/add-macos-latest-job-to-ci-pipeline
+ * [new branch]      codex/add-parameter-sliders-in-contentview           -> origin/codex/add-parameter-sliders-in-contentview
+ * [new branch]      codex/add-performance-benchmarking-target            -> origin/codex/add-performance-benchmarking-target
+ * [new branch]      codex/add-real-time-audio-level-visualization        -> origin/codex/add-real-time-audio-level-visualization
+ * [new branch]      codex/add-shaped-noise-floor-with-lpf-control        -> origin/codex/add-shaped-noise-floor-with-lpf-control
+ * [new branch]      codex/add-tests-for-audio-buffer-formats             -> origin/codex/add-tests-for-audio-buffer-formats
+ * [new branch]      codex/add-unit-tests-for-internalrenderblock         -> origin/codex/add-unit-tests-for-internalrenderblock
+ * [new branch]      codex/add-user-preset-saving-and-factory-defaults    -> origin/codex/add-user-preset-saving-and-factory-defaults
+ * [new branch]      codex/add-wow/flutter-modulation-feature             -> origin/codex/add-wow/flutter-modulation-feature
+ * [new branch]      codex/add-xctest-for-passthrough-functionality       -> origin/codex/add-xctest-for-passthrough-functionality
+ * [new branch]      codex/create-auaudiounit-node-backed-by-c-bridge     -> origin/codex/create-auaudiounit-node-backed-by-c-bridge
+ * [new branch]      codex/create-porta424audioengine-package             -> origin/codex/create-porta424audioengine-package
+ * [new branch]      codex/create-refactor-branch-and-fix-build-errors    -> origin/codex/create-refactor-branch-and-fix-build-errors
+ * [new branch]      codex/expand-test-coverage-for-portadspwrapper       -> origin/codex/expand-test-coverage-for-portadspwrapper
+ * [new branch]      codex/expose-per-channel-dbfs-in-swiftui-demo        -> origin/codex/expose-per-channel-dbfs-in-swiftui-demo
+ * [new branch]      codex/implement-dsp-module-processing-methods        -> origin/codex/implement-dsp-module-processing-methods
+ * [new branch]      codex/implement-head-bump-eq-feature                 -> origin/codex/implement-head-bump-eq-feature
+ * [new branch]      codex/implement-preset-serialization-in-params       -> origin/codex/implement-preset-serialization-in-params
+ * [new branch]      codex/implement-saturation-stage-with-drive-in-db    -> origin/codex/implement-saturation-stage-with-drive-in-db
+ * [new branch]      codex/integrate-dspcore-in-portadsp_bridge.cpp       -> origin/codex/integrate-dspcore-in-portadsp_bridge.cpp
+ * [new branch]      codex/update-developer-documentation-for-quick-start -> origin/codex/update-developer-documentation-for-quick-start
+ * [new branch]      codex/update-dropout-handling-logic                  -> origin/codex/update-dropout-handling-logic
+ * [new branch]      codex/update-eq-helper-calculations                  -> origin/codex/update-eq-helper-calculations
+ * [new branch]      codex/update-package.swift-for-testing               -> origin/codex/update-package.swift-for-testing
+ * [new branch]      codex/verify-swift-to-c-parameter-bridging           -> origin/codex/verify-swift-to-c-parameter-bridging
