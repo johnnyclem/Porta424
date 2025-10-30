@@ -8,6 +8,9 @@
 import AVFoundation
 import Combine
 import SwiftUI
+#if canImport(PortaDSPKit)
+import PortaDSPKit
+#endif
 
 // MARK: - Global Audio Engine
 class TimecodeAudioEngine: ObservableObject {
@@ -109,6 +112,12 @@ class TimecodeAudioEngine: ObservableObject {
     private var usePerTrackFiles: Bool = UserDefaults.standard.bool(forKey: "usePerTrackFiles")
     
     // MARK: Private
+    private var portaAVUnit: AVAudioUnit?
+    #if canImport(PortaDSPKit)
+    private var portaDSPUnit: PortaDSPAudioUnit?
+    #else
+    private var portaDSPUnit: Any?
+    #endif
     private let engine = AVAudioEngine()
     private let mixer = AVAudioMixerNode()
     
@@ -295,6 +304,7 @@ class TimecodeAudioEngine: ObservableObject {
         }
         installInputTapIfNeeded()
         if !engine.isRunning { try? engine.start() }
+        ensurePortaInserted()
     }
     
     // MARK: - Graph Setup
@@ -337,12 +347,72 @@ class TimecodeAudioEngine: ObservableObject {
         applyMonitoringConnection()
         
         // Output
-//        engine.connect(mixer, to: engine.mainMixerNode, format: format)
-        engine.connect(mixer, to: engine.mainMixerNode, format: nil)
-        // Removed engine.connect(playerNode, to: engine.mainMixerNode, format: format)
+        // Insert Porta DSP between our mixer and the system main mixer
+        #if canImport(PortaDSPKit)
+        PortaDSPAudioUnit.makeEngineNode(engine: engine) { [weak self] node, dsp, error in
+            guard let self = self else { return }
+            if let error = error {
+                print("Failed to create PortaDSP node: \(error)")
+                self.engine.connect(self.mixer, to: self.engine.mainMixerNode, format: nil)
+                try? self.engine.start()
+                self.installInputTapIfNeeded()
+                return
+            }
+            guard let node = node, let dsp = dsp else {
+                print("Failed to create PortaDSP node: unknown error")
+                self.engine.connect(self.mixer, to: self.engine.mainMixerNode, format: nil)
+                try? self.engine.start()
+                self.installInputTapIfNeeded()
+                return
+            }
+            self.portaAVUnit = node
+            self.portaDSPUnit = dsp
+            if node.engine == nil { self.engine.attach(node) }
+            self.engine.connect(self.mixer, to: node, format: nil)
+            self.engine.connect(node, to: self.engine.mainMixerNode, format: nil)
+            try? self.engine.start()
+            self.installInputTapIfNeeded()
+        }
+        #else
+        // Fallback: connect mixer directly to main mixer when PortaDSPKit isn't available
+        self.engine.connect(self.mixer, to: self.engine.mainMixerNode, format: nil)
+        try? self.engine.start()
+        self.installInputTapIfNeeded()
+        #endif
         
-        try? engine.start()
-        installInputTapIfNeeded()
+//        Removed commented out old connection lines related to Porta insertion
+
+//        try? engine.start()
+//        installInputTapIfNeeded()
+    }
+    
+    private func ensurePortaInserted() {
+        #if canImport(PortaDSPKit)
+        if portaAVUnit == nil || portaDSPUnit == nil {
+            PortaDSPAudioUnit.makeEngineNode(engine: engine) { [weak self] node, dsp, error in
+                guard let self = self else { return }
+                if let node = node, let dsp = dsp {
+                    self.portaAVUnit = node
+                    self.portaDSPUnit = dsp
+                    if node.engine == nil { self.engine.attach(node) }
+                    self.engine.disconnectNodeOutput(self.mixer)
+                    self.engine.connect(self.mixer, to: node, format: nil)
+                    self.engine.connect(node, to: self.engine.mainMixerNode, format: nil)
+                    try? self.engine.start()
+                } else if let error = error {
+                    print("ensurePortaInserted error: \(error)")
+                }
+            }
+        }
+        #else
+        // No PortaDSPKit: ensure mixer is connected directly to main mixer
+        let connections = engine.outputConnectionPoints(for: mixer, outputBus: 0)
+        if !connections.contains(where: { $0.node === engine.mainMixerNode }) {
+            engine.disconnectNodeOutput(mixer)
+            engine.connect(mixer, to: engine.mainMixerNode, format: nil)
+            try? engine.start()
+        }
+        #endif
     }
     
     // Ensures the engine is running and the graph is intact before starting any nodes

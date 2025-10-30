@@ -9,17 +9,32 @@
 /* Begin PBXBuildFile section */
 		EF04A8702EA94C2A00F0ADE3 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EF04A86F2EA94C2A00F0ADE3 /* AVFoundation.framework */; };
 		EF04A8722EA94C2E00F0ADE3 /* AVFAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EF04A8712EA94C2E00F0ADE3 /* AVFAudio.framework */; };
+		EFFB6E602EB2C05A00565DE7 /* PortaDSPKit in Frameworks */ = {isa = PBXBuildFile; productRef = EFFB6E5F2EB2C05A00565DE7 /* PortaDSPKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		EF04A8422EA949BC00F0ADE3 /* porta424_UI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = porta424_UI.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EF04A86F2EA94C2A00F0ADE3 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		EF04A8712EA94C2E00F0ADE3 /* AVFAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFAudio.framework; path = System/Library/Frameworks/AVFAudio.framework; sourceTree = SDKROOT; };
+		EFFB6E5D2EB2BACF00565DE7 /* Porta424 */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Porta424; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		EFFB6EC22EB3E7F600565DE7 /* Exceptions for "porta424_UI" folder in "porta424_UI" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"porta424-UI-Info.plist",
+			);
+			target = EF04A8412EA949BC00F0ADE3 /* porta424_UI */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		EF04A8442EA949BC00F0ADE3 /* porta424_UI */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				EFFB6EC22EB3E7F600565DE7 /* Exceptions for "porta424_UI" folder in "porta424_UI" target */,
+			);
 			path = porta424_UI;
 			sourceTree = "<group>";
 		};
@@ -31,6 +46,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				EF04A8702EA94C2A00F0ADE3 /* AVFoundation.framework in Frameworks */,
+				EFFB6E602EB2C05A00565DE7 /* PortaDSPKit in Frameworks */,
 				EF04A8722EA94C2E00F0ADE3 /* AVFAudio.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -60,6 +76,7 @@
 			children = (
 				EF04A8712EA94C2E00F0ADE3 /* AVFAudio.framework */,
 				EF04A86F2EA94C2A00F0ADE3 /* AVFoundation.framework */,
+				EFFB6E5D2EB2BACF00565DE7 /* Porta424 */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -84,6 +101,7 @@
 			);
 			name = porta424_UI;
 			packageProductDependencies = (
+				EFFB6E5F2EB2C05A00565DE7 /* PortaDSPKit */,
 			);
 			productName = porta424_UI;
 			productReference = EF04A8422EA949BC00F0ADE3 /* porta424_UI.app */;
@@ -113,6 +131,9 @@
 			);
 			mainGroup = EF04A8392EA949BC00F0ADE3;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				EFFB6E5E2EB2C05A00565DE7 /* XCLocalSwiftPackageReference "Porta424" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = EF04A8432EA949BC00F0ADE3 /* Products */;
 			projectDirPath = "";
@@ -277,6 +298,9 @@
 				DEVELOPMENT_TEAM = GV49AHY2S2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "porta424-UI-Info.plist";
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "rec audio";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -309,6 +333,9 @@
 				DEVELOPMENT_TEAM = GV49AHY2S2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "porta424-UI-Info.plist";
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "rec audio";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -353,6 +380,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		EFFB6E5E2EB2C05A00565DE7 /* XCLocalSwiftPackageReference "Porta424" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Porta424;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		EFFB6E5F2EB2C05A00565DE7 /* PortaDSPKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PortaDSPKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = EF04A83A2EA949BC00F0ADE3 /* Project object */;
 }
