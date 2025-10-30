@@ -5,7 +5,7 @@ import Foundation
 import PortaDSPBridge
 
 public final class PortaDSP {
-    private var handle: porta_dsp_handle?
+    private var handle: PortaDSPBridge.porta_dsp_handle?
 
     public struct Params: Codable, Equatable, Sendable {
         public var wowDepth: Float = 0.0006
@@ -69,3 +69,4 @@ public final class PortaDSP {
         return output
     }
 }
+

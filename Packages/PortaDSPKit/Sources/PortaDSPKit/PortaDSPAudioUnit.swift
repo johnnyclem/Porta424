@@ -3,6 +3,12 @@ import AudioToolbox
 import AVFoundation
 import Foundation
 
+// Provide a local alias for the opaque DSP handle if not provided by the C headers
+// This matches the typical pattern of an opaque C pointer handle.
+#if !canImport(PortaDSPCHandleTypes)
+public typealias porta_dsp_handle = OpaquePointer
+#endif
+
 public enum PortaDSPAudioUnitError: Error {
     case failedToCreateEngineNode
     case unsupportedPlatform
@@ -192,7 +198,7 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
         return map
     }()
 
-    static func definition(for id: ParameterID) -> ParameterDefinition {
+    private static func definition(for id: ParameterID) -> ParameterDefinition {
         guard let definition = parameterDefinitionsByID[id] else {
             fatalError("Missing definition for parameter id \(id)")
         }
@@ -204,62 +210,10 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
         return parameterDefinitionsByID[id]
     }
 
-    private let parameterTreeImpl: AUParameterTree
-    private let parameterMap: [ParameterID: AUParameter]
-    private var parameterObserverToken: AUParameterObserverToken?
-
-    // MARK: Component Registration
-
-    public static let componentDescription = AudioComponentDescription(
-        componentType: kAudioUnitType_Effect,
-        componentSubType: PortaDSPAudioUnit.makeFourCC("Prt4"),
-        componentManufacturer: PortaDSPAudioUnit.makeFourCC("Pdsp"),
-        componentFlags: 0,
-        componentFlagsMask: 0
-    )
-
-    private static let registration: Void = {
-        AUAudioUnit.registerSubclass(
-            PortaDSPAudioUnit.self,
-            as: PortaDSPAudioUnit.componentDescription,
-            name: "PortaDSPKit:PortaDSPAudioUnit",
-            version: UInt32(0x0001_0000)
-        )
-    }()
-
-    public static func register() {
-        _ = registration
-    }
-
-    public static func makeEngineNode(
-        engine: AVAudioEngine,
-        options: AudioComponentInstantiationOptions = [],
-        completionHandler: @escaping (AVAudioUnit?, PortaDSPAudioUnit?, Error?) -> Void
-    ) {
-        PortaDSPAudioUnit.register()
-        AVAudioUnit.instantiate(with: PortaDSPAudioUnit.componentDescription, options: options) { unit, error in
-            if let error {
-                completionHandler(nil, nil, error)
-                return
-            }
-            guard let resolvedUnit = unit else {
-                completionHandler(nil, nil, PortaDSPAudioUnitError.failedToCreateEngineNode)
-                return
-            }
-            engine.attach(resolvedUnit)
-            guard let dspUnit = resolvedUnit.auAudioUnit as? PortaDSPAudioUnit else {
-                engine.detach(resolvedUnit)
-                completionHandler(nil, nil, PortaDSPAudioUnitError.failedToCreateEngineNode)
-                return
-            }
-            completionHandler(resolvedUnit, dspUnit, nil)
-        }
-    }
-
-    // MARK: Lifecycle
-
     private let inputBus: AUAudioUnitBus
     private let outputBus: AUAudioUnitBus
+    private var inputBusArray: AUAudioUnitBusArray!
+    private var outputBusArray: AUAudioUnitBusArray!
     private var interleavedScratch: UnsafeMutablePointer<Float>?
     private var scratchCapacity: Int = 0
     private var dspHandle: porta_dsp_handle?
@@ -273,9 +227,15 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
         }
     }()
     private var currentPresetSelection: AUAudioUnitPreset?
+    private var parameterMap: [ParameterID: AUParameter] = [:]
+    private var parameterTreeImpl: AUParameterTree!
+    private var parameterObserverToken: AUParameterObserverToken?
 
     public override var canProcessInPlace: Bool { true }
-    public override var parameterTree: AUParameterTree? { parameterTreeImpl }
+    public override var inputBusses: AUAudioUnitBusArray { inputBusArray }
+    public override var outputBusses: AUAudioUnitBusArray { outputBusArray }
+
+    // Removed: public override var parameterTree: AUParameterTree? { parameterTreeImpl }
 
     public override init(componentDescription: AudioComponentDescription, options: AudioComponentInstantiationOptions = []) throws {
         var map: [ParameterID: AUParameter] = [:]
@@ -298,6 +258,8 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
         parameterMap = map
         let orderedParameters = ParameterID.allCases.compactMap { map[$0] }
         parameterTreeImpl = AUParameterTree.createTree(withChildren: orderedParameters)
+        self.parameterTree = parameterTreeImpl
+
         let defaultFormat = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
             sampleRate: 48_000,
@@ -308,8 +270,8 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
         outputBus = try AUAudioUnitBus(format: defaultFormat)
         try super.init(componentDescription: componentDescription, options: options)
         maximumFramesToRender = 4096
-        inputBusses = AUAudioUnitBusArray(owner: self, busType: .input, busses: [inputBus])
-        outputBusses = AUAudioUnitBusArray(owner: self, busType: .output, busses: [outputBus])
+        inputBusArray = AUAudioUnitBusArray(audioUnit: self, busType: .input, busses: [inputBus])
+        outputBusArray = AUAudioUnitBusArray(audioUnit: self, busType: .output, busses: [outputBus])
         parameterObserverToken = parameterTreeImpl.token(byAddingParameterObserver: { [weak self] address, value in
             self?.handleParameterChange(address: address, value: value)
         })
@@ -724,3 +686,7 @@ public enum PortaDSPNodeFactory {
     }
 }
 #endif
+
+
+
+
