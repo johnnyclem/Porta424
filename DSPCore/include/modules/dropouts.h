@@ -4,6 +4,11 @@
 #include <cmath>
 #include <cstdint>
 
+/**
+ * Simulates mechanical tape dropouts by modulating a shared gain envelope.
+ * The envelope follows a four-stage ADSR-like shape with randomized hold
+ * durations and a simple linear congruential RNG for deterministic tests.
+ */
 class Dropouts {
 public:
     Dropouts() = default;
@@ -26,9 +31,8 @@ public:
         dropoutsTriggered_ = 0;
     }
 
-    void setRate(float ratePerMinute) {
-        dropoutRatePerMinute_ = std::max(ratePerMinute, 0.0f);
-    }
+    /** Rate of dropouts expressed as events per minute. */
+    void setRate(float ratePerMinute) { dropoutRatePerMinute_ = std::max(ratePerMinute, 0.0f); }
 
     void setSeed(uint32_t seed) { rngState_ = seed; }
 
@@ -37,6 +41,7 @@ public:
         maxHoldSamples_ = std::max(minHoldSamples_, maxSamples);
     }
 
+    /** Apply the dropout envelope to an interleaved buffer in place. */
     void process(float* interleaved, int frames, int channels) {
         if (!interleaved || frames <= 0 || channels <= 0) {
             return;

@@ -4,6 +4,7 @@
 #include <cmath>
 #include "module.h"
 
+/** Simple tanh-based soft clipper used to mimic tape saturation. */
 class Saturation : public Module {
 public:
     void prepare(float sampleRate, int maxBlockSize) override {
@@ -12,11 +13,13 @@ public:
         update();
     }
 
+    /** Input drive in decibels. */
     void setDriveDb(float db) {
         driveDb = db;
         update();
     }
 
+    /** Output trim in decibels to compensate for drive changes. */
     void setOutputGainDb(float db) {
         outputGainDb = db;
         update();

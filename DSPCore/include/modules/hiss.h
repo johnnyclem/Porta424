@@ -5,6 +5,7 @@
 #include <random>
 #include <vector>
 
+/** Wideband noise generator used to add subtle tape hiss. */
 class Hiss {
 public:
     Hiss();

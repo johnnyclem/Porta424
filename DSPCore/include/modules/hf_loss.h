@@ -4,6 +4,7 @@
 #include <cmath>
 #include <vector>
 
+/** Two-stage low-pass filter that simulates tape head high-frequency roll-off. */
 class HFLoss {
 public:
     void prepare(float sampleRate, int maxChannels);

@@ -5,6 +5,7 @@
 #include <vector>
 #include "module.h"
 
+/** Simple peak meter that tracks per-channel maxima per processed block. */
 class Meters : public Module {
 public:
     void prepare(float sampleRate, int maxBlockSize) override {
