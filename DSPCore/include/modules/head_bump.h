@@ -4,6 +4,7 @@
 #include <cmath>
 #include <vector>
 
+/** Low-frequency resonant filter that recreates analog head bump coloration. */
 class HeadBump {
 public:
     void prepare(float sampleRate, int channels) {

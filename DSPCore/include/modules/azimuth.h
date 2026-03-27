@@ -4,6 +4,7 @@
 #include <cmath>
 #include <vector>
 
+/** Stereo azimuth misalignment emulator using an LFO-driven delay offset. */
 class Azimuth {
 public:
     void prepare(float newSampleRate, int maxBlockSize)

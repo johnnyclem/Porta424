@@ -5,6 +5,11 @@
 #include <cstdint>
 #include <vector>
 
+/**
+ * Downward compressor/expander used for tape noise reduction. The class tracks
+ * one envelope follower and gain computer per channel and supports per-track
+ * bypassing for the NR-incompatible track.
+ */
 class Compander {
 public:
     Compander() = default;
@@ -15,6 +20,7 @@ public:
         updateCoefficients();
     }
 
+    /** Resize the per-channel state buffers as needed. */
     void setChannelCount(int channels) {
         const int count = std::max(channels, 1);
         if (static_cast<int>(states_.size()) != count) {
@@ -23,6 +29,10 @@ public:
         }
     }
 
+    /**
+     * Enable or disable processing on a specific track (0-based index). Out of
+     * range requests automatically resize the bypass mask and state vectors.
+     */
     void setTrackBypass(int trackIndex, bool bypass) {
         if (trackIndex < 0) {
             return;
@@ -33,6 +43,11 @@ public:
         bypassMask_[trackIndex] = bypass ? 1 : 0;
     }
 
+    /**
+     * Apply compression to an interleaved buffer in place.
+     * The detector uses a simple peak follower with different attack/release
+     * coefficients and smoothed gain to reduce zipper noise.
+     */
     void process(float* interleaved, int frames, int channels) {
         if (!interleaved || frames <= 0 || channels <= 0) {
             return;
@@ -50,8 +65,7 @@ public:
 
                 const int index = i * channels + c;
                 float sample = interleaved[index];
-                float level = std::fabs(sample);
-                level = std::max(level, detectorFloor_);
+                float level = std::max(std::fabs(sample), detectorFloor_);
 
                 ChannelState& state = states_[c];
                 if (level > state.envelope) {
@@ -85,13 +99,8 @@ private:
         gainSmoothing_ = std::exp(-1.0f / (0.020f * sampleRate_));
     }
 
-    static float linearToDb(float value) {
-        return 20.0f * std::log10(value);
-    }
-
-    static float dbToLinear(float db) {
-        return std::pow(10.0f, db / 20.0f);
-    }
+    static float linearToDb(float value) { return 20.0f * std::log10(value); }
+    static float dbToLinear(float db) { return std::pow(10.0f, db / 20.0f); }
 
     float compressionGain(float envDb) const {
         const float lowerKnee = thresholdDb_ - 0.5f * kneeWidthDb_;

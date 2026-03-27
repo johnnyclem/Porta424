@@ -6,6 +6,11 @@
 #include <random>
 #include <vector>
 
+/**
+ * Generates wow and flutter modulation using independent sine LFOs and a
+ * modulated delay line. The effect is intentionally lightweight and maintains
+ * its own buffer + RNG state for deterministic playback.
+ */
 class WowFlutter {
 public:
     WowFlutter() = default;
@@ -81,6 +86,7 @@ public:
         return output;
     }
 
+    /** Apply modulation to an array of mono samples. */
     void process(float* samples, std::size_t count) {
         if (!samples) {
             return;

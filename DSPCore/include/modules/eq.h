@@ -5,6 +5,10 @@
 #include "module.h"
 #include "biquad.h"
 
+/**
+ * Three-band EQ used to emulate the tape machine tone controls. The class owns
+ * one biquad per band per channel and simply cascades them for each sample.
+ */
 class EQ : public Module {
 public:
     void prepare(float sampleRate, int maxBlockSize) override {
@@ -13,30 +17,33 @@ public:
         resetChannels(2);
     }
 
-    void reset() override {
-        resetChannels(currentChannels);
-    }
+    void reset() override { resetChannels(currentChannels); }
 
+    /** Update the low-shelf gain in decibels. */
     void setLowGainDb(float db) {
         lowGainDb = db;
         updateCoefficients();
     }
 
+    /** Update the mid bell gain in decibels. */
     void setMidGainDb(float db) {
         midGainDb = db;
         updateCoefficients();
     }
 
+    /** Update the high-shelf gain in decibels. */
     void setHighGainDb(float db) {
         highGainDb = db;
         updateCoefficients();
     }
 
+    /** Center frequency for the mid bell, clamped to a sensible range. */
     void setMidFrequency(float freq) {
         midFrequency = std::clamp(freq, 200.0f, fs * 0.45f);
         updateCoefficients();
     }
 
+    /** Quality factor for the mid bell. */
     void setMidQ(float qValue) {
         midQ = std::clamp(qValue, 0.2f, 10.0f);
         updateCoefficients();
@@ -50,7 +57,7 @@ public:
         ensureStateSize(numChannels);
         for (int i = 0; i < numFrames; ++i) {
             for (int c = 0; c < numChannels; ++c) {
-                int idx = i * numChannels + c;
+                const int idx = i * numChannels + c;
                 float sample = interleavedBuffer[idx];
                 sample = lowShelfStates[c].process(sample);
                 sample = peakStates[c].process(sample);
