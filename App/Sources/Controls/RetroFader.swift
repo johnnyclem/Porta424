@@ -128,19 +128,42 @@ struct RetroFader: View {
     }
 }
 
-/// Vertical LED segment meter (green → yellow → red).
+/// Vertical LED segment meter (green → yellow → red) with subtle flicker.
 struct LEDMeter: View {
     var value: Double
     var segments: Int = 10
+
+    @State private var flickerSeed: UInt64 = 0
 
     var body: some View {
         VStack(spacing: 2) {
             ForEach((0..<segments).reversed(), id: \.self) { i in
                 let threshold = Double(i + 1) / Double(segments)
+                let isLit = value >= threshold
                 RoundedRectangle(cornerRadius: 1)
                     .fill(segmentColor(for: i))
-                    .opacity(value >= threshold ? 1.0 : 0.15)
+                    .opacity(isLit ? ledFlickerOpacity(segment: i) : 0.15)
+                    .shadow(
+                        color: isLit ? segmentColor(for: i).opacity(0.4) : .clear,
+                        radius: isLit ? 2 : 0
+                    )
                     .frame(height: 6)
+            }
+        }
+        .onAppear { startFlicker() }
+    }
+
+    // Subtle per-segment brightness variation simulating real LED behavior
+    private func ledFlickerOpacity(segment: Int) -> Double {
+        let hash = (flickerSeed &+ UInt64(segment * 7)) % 100
+        return 0.88 + Double(hash) / 100.0 * 0.12  // 0.88 to 1.0
+    }
+
+    private func startFlicker() {
+        Task { @MainActor in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(100))
+                flickerSeed = UInt64.random(in: 0...999)
             }
         }
     }

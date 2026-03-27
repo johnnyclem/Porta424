@@ -9,6 +9,10 @@ struct RetroTransportButton: View {
     var action: () -> Void
 
     @State private var isPressed = false
+    @State private var breathePhase: Double = 0
+
+    // Is this the record button? Gets a distinctive pulse.
+    private var isRecButton: Bool { label == "REC" }
 
     var body: some View {
         Button {
@@ -56,16 +60,43 @@ struct RetroTransportButton: View {
                 .frame(width: 50, height: 42)
                 .offset(y: isPressed ? 2 : 0)
                 .overlay(
-                    // Active glow
+                    // Active glow with breathing pulse
                     RoundedRectangle(cornerRadius: 8)
                         .fill(color)
-                        .opacity(isActive ? 0.3 : 0)
-                        .blur(radius: 8)
+                        .opacity(isActive ? activeGlowOpacity : 0)
+                        .blur(radius: isActive ? activeGlowRadius : 8)
                         .frame(width: 50, height: 42)
                 )
             }
         }
         .buttonStyle(TransportButtonStyle(isPressed: $isPressed))
+        .onAppear { startBreathe() }
+    }
+
+    // REC gets a more dramatic pulse; others get a gentle breathe
+    private var activeGlowOpacity: Double {
+        if isRecButton {
+            return 0.25 + breathePhase * 0.35
+        }
+        return 0.25 + breathePhase * 0.1
+    }
+
+    private var activeGlowRadius: CGFloat {
+        if isRecButton {
+            return 6 + CGFloat(breathePhase) * 6
+        }
+        return 7 + CGFloat(breathePhase) * 2
+    }
+
+    private func startBreathe() {
+        Task { @MainActor in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(40))
+                // REC breathes faster (urgent), others are gentle
+                let speed: Double = isRecButton ? 2.5 : 1.2
+                breathePhase = sin(Date.timeIntervalSinceReferenceDate * speed) * 0.5 + 0.5
+            }
+        }
     }
 }
 
