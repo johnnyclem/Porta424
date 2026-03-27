@@ -9,6 +9,8 @@ struct CassetteView: View {
 
     @State private var reelRotation: Double = 0
     @State private var isAnimating = false
+    @State private var wobblePhase: Double = 0
+    @State private var tapeShimmer: Double = 0
 
     // Reel speeds based on transport
     private var reelSpeed: Double {
@@ -23,6 +25,11 @@ struct CassetteView: View {
 
     private var isSpinning: Bool {
         reelSpeed != 0
+    }
+
+    // Subtle speed wobble simulating motor imperfection
+    private var wobbleAmount: Double {
+        sin(wobblePhase * 0.7) * 0.15 + sin(wobblePhase * 1.3) * 0.08
     }
 
     var body: some View {
@@ -51,6 +58,21 @@ struct CassetteView: View {
                 RoundedRectangle(cornerRadius: 6)
                     .fill(Color(white: 0.88).opacity(0.6))
                     .frame(width: 120, height: 65)
+                    .overlay(
+                        // Subtle tape window shimmer (light reflection)
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.0),
+                                        Color.white.opacity(isSpinning ? 0.06 + tapeShimmer * 0.04 : 0.02),
+                                        Color.white.opacity(0.0)
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                    )
 
                 // Tape ribbon between reels
                 tapeRibbon
@@ -149,7 +171,10 @@ struct CassetteView: View {
             while isAnimating {
                 try? await Task.sleep(for: .milliseconds(16)) // ~60fps
                 if isSpinning {
-                    reelRotation += reelSpeed * 3
+                    wobblePhase += 0.05
+                    tapeShimmer = sin(wobblePhase * 1.1) * 0.5 + 0.5
+                    // Apply wobble for organic motor feel
+                    reelRotation += (reelSpeed + wobbleAmount) * 3
                 } else {
                     isAnimating = false
                 }
@@ -169,7 +194,7 @@ struct CassetteReel: View {
 
     var body: some View {
         ZStack {
-            // Tape winding (brown circle)
+            // Tape winding (brown circle) with subtle concentric rings
             Circle()
                 .fill(
                     RadialGradient(
@@ -183,8 +208,18 @@ struct CassetteReel: View {
                     )
                 )
                 .frame(width: tapeRadius * 2, height: tapeRadius * 2)
+                .overlay(
+                    // Tape wind lines that rotate with the reel
+                    Circle()
+                        .strokeBorder(
+                            Color(red: 0.40, green: 0.28, blue: 0.16).opacity(0.3),
+                            lineWidth: 0.5
+                        )
+                        .frame(width: tapeRadius * 1.4, height: tapeRadius * 1.4)
+                        .rotationEffect(.degrees(rotation * 0.5))
+                )
 
-            // Hub
+            // Hub with rotating light catch
             Circle()
                 .fill(
                     RadialGradient(
@@ -198,6 +233,23 @@ struct CassetteReel: View {
                 .overlay(
                     Circle()
                         .strokeBorder(Color(white: 0.40), lineWidth: 0.5)
+                )
+                .overlay(
+                    // Rotating light glint on hub
+                    Circle()
+                        .fill(
+                            AngularGradient(
+                                colors: [
+                                    Color.white.opacity(0.0),
+                                    Color.white.opacity(isSpinning ? 0.25 : 0.0),
+                                    Color.white.opacity(0.0),
+                                    Color.white.opacity(0.0)
+                                ],
+                                center: .center
+                            )
+                        )
+                        .frame(width: hubRadius * 1.8, height: hubRadius * 1.8)
+                        .rotationEffect(.degrees(rotation))
                 )
 
             // Spokes (rotate with reel)

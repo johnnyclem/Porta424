@@ -6,6 +6,9 @@ struct VUMeterView: View {
     var value: Double          // 0...1 normalized level
     var channel: String = "L"  // "L" or "R"
 
+    @State private var idleDrift: Double = 0
+    @State private var redZoneGlow: Double = 0
+
     // Needle angle: -45° (silence) to +45° (full scale)
     private let needleMin: Double = -40
     private let needleMax: Double = 40
@@ -14,8 +17,14 @@ struct VUMeterView: View {
         // VU meters have logarithmic-ish response
         let clamped = max(0, min(1, value))
         let curved = pow(clamped, 0.6) // slight log curve
-        return needleMin + (needleMax - needleMin) * curved
+        let base = needleMin + (needleMax - needleMin) * curved
+        // Add subtle idle drift when near silence (simulates real meter friction)
+        let drift = clamped < 0.05 ? idleDrift : 0
+        return base + drift
     }
+
+    // Whether the needle is in the red zone
+    private var isInRedZone: Bool { value > 0.72 }
 
     var body: some View {
         VStack(spacing: 3) {
@@ -32,6 +41,11 @@ struct VUMeterView: View {
                 VUScale()
                     .padding(.top, 6)
                     .padding(.horizontal, 4)
+
+                // Red zone glow when needle is peaking
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Porta.meterRed.opacity(isInRedZone ? 0.06 + redZoneGlow * 0.04 : 0))
+                    .animation(.easeInOut(duration: 0.15), value: isInRedZone)
 
                 // Needle
                 VUNeedle(angle: needleAngle)
@@ -50,6 +64,19 @@ struct VUMeterView: View {
             Text(channel)
                 .font(.system(size: 9, weight: .heavy, design: .rounded))
                 .foregroundStyle(Porta.label.opacity(0.7))
+        }
+        .onAppear { startIdleDrift() }
+    }
+
+    private func startIdleDrift() {
+        Task { @MainActor in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(80))
+                // Tiny random drift simulating mechanical imperfection
+                idleDrift = Double.random(in: -0.4...0.4)
+                // Pulsing red zone glow
+                redZoneGlow = sin(Date.timeIntervalSinceReferenceDate * 3) * 0.5 + 0.5
+            }
         }
     }
 }

@@ -7,6 +7,8 @@ struct TapeCounterView: View {
     var isRunning: Bool = false
     var onReset: () -> Void = {}
 
+    @State private var glowPulse: Double = 0
+
     var body: some View {
         HStack(spacing: 8) {
             // "TAPE COUNTER" label
@@ -17,6 +19,15 @@ struct TapeCounterView: View {
                     .font(.system(size: 7, weight: .heavy, design: .rounded))
             }
             .foregroundStyle(Porta.label)
+
+            // Power indicator LED dot
+            Circle()
+                .fill(isRunning ? Porta.ledGreen : Porta.meterOff)
+                .frame(width: 5, height: 5)
+                .shadow(
+                    color: isRunning ? Porta.ledGreen.opacity(0.6 + glowPulse * 0.3) : .clear,
+                    radius: isRunning ? 3 : 0
+                )
 
             // Reset button (small cassette icon)
             Button {
@@ -45,17 +56,23 @@ struct TapeCounterView: View {
                             .strokeBorder(Color(white: 0.25), lineWidth: 1)
                     )
 
+                // Subtle screen glow from LED digits
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(
+                        Porta.ledGreen.opacity(0.03 + glowPulse * 0.015)
+                    )
+
                 // Ghost digits (all segments dimly lit)
                 Text("88:88:88")
                     .font(.system(size: 18, weight: .bold, design: .monospaced))
                     .foregroundStyle(Porta.ledGreen.opacity(0.08))
 
-                // Active digits
+                // Active digits with breathing glow
                 Text(counterText)
                     .font(.system(size: 18, weight: .bold, design: .monospaced))
                     .foregroundStyle(Porta.ledGreen)
-                    .shadow(color: Porta.ledGreen.opacity(0.6), radius: 4)
-                    .shadow(color: Porta.ledGreen.opacity(0.3), radius: 8)
+                    .shadow(color: Porta.ledGreen.opacity(0.5 + glowPulse * 0.15), radius: 4)
+                    .shadow(color: Porta.ledGreen.opacity(0.25 + glowPulse * 0.1), radius: 8)
 
                 // Colon blink when running
                 if isRunning {
@@ -67,6 +84,17 @@ struct TapeCounterView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .portaPanel(cornerRadius: 6)
+        .onAppear { startGlowPulse() }
+    }
+
+    private func startGlowPulse() {
+        Task { @MainActor in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(50))
+                // Slow breathing pulse for LED glow
+                glowPulse = sin(Date.timeIntervalSinceReferenceDate * 1.5) * 0.5 + 0.5
+            }
+        }
     }
 }
 
