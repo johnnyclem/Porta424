@@ -6,12 +6,18 @@ struct Porta424App: App {
 
     var body: some Scene {
         WindowGroup {
-            TapeDeckView()
-                .environment(viewModel)
-                .preferredColorScheme(.light)
-                .task {
-                    await viewModel.boot()
+            Group {
+                if UIDevice.current.userInterfaceIdiom == .pad {
+                    iPadTapeDeckView()
+                } else {
+                    TapeDeckView()
                 }
+            }
+            .environment(viewModel)
+            .preferredColorScheme(.light)
+            .task {
+                await viewModel.boot()
+            }
         }
     }
 }
