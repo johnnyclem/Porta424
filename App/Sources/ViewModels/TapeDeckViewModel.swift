@@ -18,6 +18,10 @@ final class TapeDeckViewModel {
     var tapePosition: Double = 0     // 0...1
     var counterSeconds: Double = 0
 
+    /// Six-channel mixer board state. UI-side mixer parameters (trim, EQ, pan,
+    /// channel faders) that mirror the hardware front panel.
+    var channels: [ChannelState] = .defaultBoard
+
     var factoryPresets: [PresetItem] = []
     var userPresets: [PresetItem] = []
     var activePresetId: String?
@@ -125,6 +129,22 @@ final class TapeDeckViewModel {
     func resetCounter() {
         counterSeconds = 0
         tapePosition = 0
+    }
+
+    // MARK: - Mixer Controls
+
+    /// Toggle the record-arm state of a mixer channel by its index (0-based).
+    func toggleArm(channelIndex: Int) {
+        guard channels.indices.contains(channelIndex) else { return }
+        channels[channelIndex].isArmed.toggle()
+        HapticEngine.buttonPress()
+    }
+
+    /// Toggle a channel's input source between MIC and LINE.
+    func toggleSource(channelIndex: Int) {
+        guard channels.indices.contains(channelIndex) else { return }
+        channels[channelIndex].source.toggle()
+        HapticEngine.buttonPress()
     }
 
     // MARK: - Counter String

@@ -20,6 +20,7 @@ struct iPadTapeDeckView: View {
 
     @State private var isDrawerOpen = true
     @State private var drawerDragOffset: CGFloat = 0
+    @State private var showMixer = false
 
     var body: some View {
         GeometryReader { geo in
@@ -51,6 +52,10 @@ struct iPadTapeDeckView: View {
         }
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
+        .fullScreenCover(isPresented: $showMixer) {
+            MixerBoardView(onClose: { showMixer = false })
+                .environment(viewModel)
+        }
     }
 
     // MARK: - Landscape Layout (Primary)
@@ -58,7 +63,7 @@ struct iPadTapeDeckView: View {
     private func landscapeLayout(geo: GeometryProxy, drawerWidth: CGFloat) -> some View {
         HStack(spacing: 0) {
             // Left: Side drawer (1/3)
-            SideDrawerView(viewModel: viewModel)
+            SideDrawerView(viewModel: viewModel, onOpenMixer: { showMixer = true })
                 .frame(width: drawerWidth)
 
             // Divider rail
@@ -93,7 +98,7 @@ struct iPadTapeDeckView: View {
 
                 // Drawer panel
                 HStack(spacing: 0) {
-                    SideDrawerView(viewModel: viewModel)
+                    SideDrawerView(viewModel: viewModel, onOpenMixer: { showMixer = true })
                         .frame(width: drawerWidth)
                         .background(Porta.chassis)
                         .shadow(color: .black.opacity(0.3), radius: 12, x: 4, y: 0)

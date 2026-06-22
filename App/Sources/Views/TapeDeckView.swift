@@ -8,6 +8,8 @@ import SwiftUI
 struct TapeDeckView: View {
     @Environment(TapeDeckViewModel.self) var viewModel
 
+    @State private var showMixer = false
+
     var body: some View {
         GeometryReader { geo in
             let isCompact = geo.size.width < 700
@@ -29,6 +31,10 @@ struct TapeDeckView: View {
         }
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
+        .fullScreenCover(isPresented: $showMixer) {
+            MixerBoardView(onClose: { showMixer = false })
+                .environment(viewModel)
+        }
     }
 
     // MARK: - Landscape Layout (Primary - matches concept art)
@@ -204,16 +210,38 @@ struct TapeDeckView: View {
 
             Spacer()
 
-            // Cassette icon + settings
+            // Cassette icon + mixer board entry
             HStack(spacing: 10) {
                 Image(systemName: "cassette.fill")
                     .font(.system(size: 16))
                     .foregroundStyle(Porta.label.opacity(0.5))
 
-                // Settings placeholder
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Porta.label.opacity(0.4))
+                // Open the six-channel mixer board face
+                Button {
+                    HapticEngine.buttonPress()
+                    showMixer = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "slider.vertical.3")
+                            .font(.system(size: 13, weight: .bold))
+                        Text("MIXER")
+                            .font(.system(size: 9, weight: .heavy, design: .rounded))
+                            .tracking(1)
+                    }
+                    .foregroundStyle(Porta.label)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(Porta.chassis)
+                            .shadow(color: Porta.softShadow, radius: 1, x: 0, y: 1)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5)
+                            .strokeBorder(Porta.bezel.opacity(0.5), lineWidth: 0.5)
+                    )
+                }
+                .buttonStyle(.plain)
             }
         }
     }

@@ -238,6 +238,9 @@ guard loaded.isCompatible() else { /* handle version mismatch */ }
 The repository includes a full-featured tape deck application built with SwiftUI:
 
 - **Retro cassette UI** with animated reels and realistic tape deck controls
+- **Six-channel mixer board** -- a faithful Portastudio 424 mkIII front panel with
+  per-channel trim, 3-band EQ, FX sends, pan, record-arm, and faders. Reachable from
+  the **MIXER** button in the header (or the iPad utility drawer)
 - **4-track mixing** with per-channel VU meters
 - **Real-time parameter control** via the `@Observable` TapeDeckViewModel
 - **Haptic feedback** on transport controls (iOS)
@@ -310,9 +313,9 @@ Or in Xcode: select the **PortaDSPKit** scheme and press **Cmd+U**.
 Porta424/
 ├── App/                        Porta424 tape deck app (SwiftUI)
 │   └── Sources/
-│       ├── Models/             DSPState, data models
+│       ├── Models/             DSPState, MixerState, data models
 │       ├── ViewModels/         TapeDeckViewModel
-│       ├── Views/              TapeDeckView, CassetteView, VUMeterView
+│       ├── Views/              TapeDeckView, MixerBoardView, CassetteView, VUMeterView
 │       ├── Controls/           Custom UI controls
 │       ├── Theme/              Visual styling
 │       ├── Haptics/            Haptic feedback engine

@@ -6,6 +6,9 @@ import SwiftUI
 struct SideDrawerView: View {
     @Bindable var viewModel: TapeDeckViewModel
 
+    /// Invoked when the user taps the mixer-board entry in the header.
+    var onOpenMixer: () -> Void = {}
+
     @State private var selectedTab: DrawerTab = .effects
 
     var body: some View {
@@ -73,9 +76,32 @@ struct SideDrawerView: View {
 
             Spacer()
 
-            Image(systemName: "slider.horizontal.3")
-                .font(.system(size: 14))
-                .foregroundStyle(Porta.label.opacity(0.4))
+            // Open the full six-channel mixer board
+            Button {
+                HapticEngine.buttonPress()
+                onOpenMixer()
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "slider.vertical.3")
+                        .font(.system(size: 13, weight: .bold))
+                    Text("MIXER")
+                        .font(.system(size: 9, weight: .heavy, design: .rounded))
+                        .tracking(1)
+                }
+                .foregroundStyle(Porta.label)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(Porta.chassis)
+                        .shadow(color: Porta.softShadow, radius: 1, x: 0, y: 1)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 5)
+                        .strokeBorder(Porta.bezel.opacity(0.5), lineWidth: 0.5)
+                )
+            }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 14)
         .padding(.top, 14)
