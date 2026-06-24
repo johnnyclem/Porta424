@@ -12,6 +12,8 @@ public typealias porta_dsp_handle = OpaquePointer
 public enum PortaDSPAudioUnitError: Error {
     case failedToCreateEngineNode
     case unsupportedPlatform
+    case formatNotSupported
+    case failedInitialization
 }
 
 public final class PortaDSPAudioUnit: AUAudioUnit {
@@ -415,7 +417,7 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
     public override func allocateRenderResources() throws {
         try super.allocateRenderResources()
         guard inputBus.format.channelCount == outputBus.format.channelCount else {
-            throw AUAudioUnitError(.formatNotSupported)
+            throw PortaDSPAudioUnitError.formatNotSupported
         }
         let channels = Int(outputBus.format.channelCount)
         let frames = Int(maximumFramesToRender)
@@ -576,6 +578,35 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
         }
         return result
     }
+
+    // MARK: Audio Component Registration
+
+    /// The audio component description used to register and instantiate this unit.
+    public static let componentDescription: AudioComponentDescription = {
+        var description = AudioComponentDescription()
+        description.componentType = kAudioUnitType_Effect
+        description.componentSubType = makeFourCC("P424")
+        description.componentManufacturer = makeFourCC("Tsc4")
+        description.componentFlags = 0
+        description.componentFlagsMask = 0
+        return description
+    }()
+
+    // Lazily registers the subclass exactly once (static `let` is thread-safe
+    // and evaluated at most one time).
+    private static let registrationToken: Void = {
+        AUAudioUnit.registerSubclass(
+            PortaDSPAudioUnit.self,
+            as: PortaDSPAudioUnit.componentDescription,
+            name: "Porta424: PortaDSP",
+            version: 1
+        )
+    }()
+
+    /// Registers this audio unit with the component system. Safe to call repeatedly.
+    public static func register() {
+        _ = registrationToken
+    }
 }
 
 public enum PortaDSPNodeFactory {
@@ -598,7 +629,7 @@ public enum PortaDSPNodeFactory {
             throw error
         }
         guard let resolvedUnit = unit else {
-            throw AUAudioUnitError(.failedInitialization)
+            throw PortaDSPAudioUnitError.failedInitialization
         }
         return resolvedUnit
     }
@@ -609,6 +640,8 @@ import Foundation
 public enum PortaDSPAudioUnitError: Error {
     case failedToCreateEngineNode
     case unsupportedPlatform
+    case formatNotSupported
+    case failedInitialization
 }
 
 public struct AudioComponentDescription: Sendable {
