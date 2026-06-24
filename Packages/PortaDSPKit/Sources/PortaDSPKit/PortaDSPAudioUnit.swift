@@ -2,6 +2,7 @@
 import AudioToolbox
 import AVFoundation
 import Foundation
+import PortaDSPBridge
 
 // Provide a local alias for the opaque DSP handle if not provided by the C headers
 // This matches the typical pattern of an opaque C pointer handle.
