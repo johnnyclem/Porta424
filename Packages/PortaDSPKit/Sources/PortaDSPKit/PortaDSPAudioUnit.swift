@@ -4,12 +4,6 @@ import AVFoundation
 import Foundation
 import PortaDSPBridge
 
-// Provide a local alias for the opaque DSP handle if not provided by the C headers
-// This matches the typical pattern of an opaque C pointer handle.
-#if !canImport(PortaDSPCHandleTypes)
-public typealias porta_dsp_handle = OpaquePointer
-#endif
-
 public enum PortaDSPAudioUnitError: Error {
     case failedToCreateEngineNode
     case unsupportedPlatform
@@ -219,7 +213,7 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
     private var outputBusArray: AUAudioUnitBusArray!
     private var interleavedScratch: UnsafeMutablePointer<Float>?
     private var scratchCapacity: Int = 0
-    private var dspHandle: porta_dsp_handle?
+    private var dspHandle: PortaDSPBridge.porta_dsp_handle?
     private var lastParams = PortaDSP.Params()
     private lazy var internalFactoryPresets: [AUAudioUnitPreset] = {
         PortaPreset.factoryPresets.enumerated().map { index, preset in
