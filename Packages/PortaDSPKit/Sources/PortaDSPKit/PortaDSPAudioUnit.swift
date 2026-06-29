@@ -255,7 +255,6 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
         parameterMap = map
         let orderedParameters = ParameterID.allCases.compactMap { map[$0] }
         parameterTreeImpl = AUParameterTree.createTree(withChildren: orderedParameters)
-        self.parameterTree = parameterTreeImpl
 
         let defaultFormat = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
@@ -266,6 +265,9 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
         inputBus = try AUAudioUnitBus(format: defaultFormat)
         outputBus = try AUAudioUnitBus(format: defaultFormat)
         try super.init(componentDescription: componentDescription, options: options)
+        // `parameterTree` is an inherited AUAudioUnit property, so it can only be
+        // assigned after super.init.
+        self.parameterTree = parameterTreeImpl
         maximumFramesToRender = 4096
         inputBusArray = AUAudioUnitBusArray(audioUnit: self, busType: .input, busses: [inputBus])
         outputBusArray = AUAudioUnitBusArray(audioUnit: self, busType: .output, busses: [outputBus])
