@@ -131,11 +131,8 @@ final class PortaDSPAudioUnitRenderTests: XCTestCase {
 
         let pullBlock: AURenderPullInputBlock = { flags, _, frameCount, busNumber, data in
             if offline {
-                XCTAssertNotNil(flags, "Offline rendering should provide action flags")
-                if let flags {
-                    XCTAssertTrue(flags.pointee.contains(.offlineUnitRenderAction_Render))
-                }
-            } else if let flags {
+                XCTAssertTrue(flags.pointee.contains(.offlineUnitRenderAction_Render))
+            } else {
                 XCTAssertFalse(flags.pointee.contains(.offlineUnitRenderAction_Render))
             }
             XCTAssertEqual(Int(frameCount), frames)
