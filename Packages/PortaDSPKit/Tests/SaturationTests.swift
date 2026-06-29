@@ -37,6 +37,7 @@ final class SaturationTests: XCTestCase {
             }
             previousRMS = metrics.rms
             thdValues.append(metrics.thd)
+            maxObservedTHD = max(maxObservedTHD, metrics.thd)
         }
 
         guard let minTHD = thdValues.min(), let maxTHD = thdValues.max() else {

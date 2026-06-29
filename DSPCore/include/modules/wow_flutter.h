@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <random>
 #include <vector>
 
@@ -30,6 +31,9 @@ public:
         mDelayBufferLength = std::max<std::size_t>(static_cast<std::size_t>(mSampleRate * maxDelaySeconds), minBuffer);
         mDelayBuffer.assign(mDelayBufferLength, 0.0f);
         mWriteIndex = 0;
+        // Re-seed deterministically so freshly-prepared instances are
+        // reproducible (the module is documented as deterministic playback).
+        mRng.seed(kRngSeed);
         randomizePhase();
 
         mPhaseDriftInterval = std::max(1, static_cast<int>(mSampleRate * 0.5f));
@@ -40,6 +44,7 @@ public:
     void reset() {
         std::fill(mDelayBuffer.begin(), mDelayBuffer.end(), 0.0f);
         mWriteIndex = 0;
+        mRng.seed(kRngSeed);
         randomizePhase();
         mPhaseDriftCounter = mPhaseDriftInterval;
         mCurrentModulation = 0.0f;
@@ -155,5 +160,6 @@ private:
 
     float mCurrentModulation = 0.0f;
 
-    std::mt19937 mRng{std::random_device{}()};
+    static constexpr std::uint32_t kRngSeed = 0x9E3779B9u;
+    std::mt19937 mRng{kRngSeed};
 };
