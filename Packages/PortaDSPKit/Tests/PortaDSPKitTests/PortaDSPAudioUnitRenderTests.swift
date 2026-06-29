@@ -133,10 +133,10 @@ final class PortaDSPAudioUnitRenderTests: XCTestCase {
             if offline {
                 XCTAssertNotNil(flags, "Offline rendering should provide action flags")
                 if let flags {
-                    XCTAssertTrue(flags.pointee.contains(.offline))
+                    XCTAssertTrue(flags.pointee.contains(.offlineUnitRenderAction_Render))
                 }
             } else if let flags {
-                XCTAssertFalse(flags.pointee.contains(.offline))
+                XCTAssertFalse(flags.pointee.contains(.offlineUnitRenderAction_Render))
             }
             XCTAssertEqual(Int(frameCount), frames)
             XCTAssertEqual(busNumber, 0)
@@ -144,7 +144,7 @@ final class PortaDSPAudioUnitRenderTests: XCTestCase {
             return noErr
         }
 
-        var flags: AudioUnitRenderActionFlags = offline ? [.offline] : []
+        var flags: AudioUnitRenderActionFlags = offline ? [.offlineUnitRenderAction_Render] : []
         var timestamp = AudioTimeStamp()
         let status = withUnsafePointer(to: &timestamp) { tsPtr in
             unit.internalRenderBlock(&flags, tsPtr, AUAudioFrameCount(frames), 0, buffers.unsafeMutablePointer, nil, pullBlock)
@@ -218,7 +218,8 @@ final class PortaDSPAudioUnitRenderTests: XCTestCase {
                 pointer.deallocate()
             }
         }
-        buffers.deallocate()
+        // AudioBufferList.allocate(maximumBuffers:) uses malloc; free it with free().
+        free(buffers.unsafeMutablePointer)
     }
 
     private func write(samples: [[Float]], to list: UnsafeMutablePointer<AudioBufferList>?, interleaved: Bool, frames: Int, channels: Int) {
