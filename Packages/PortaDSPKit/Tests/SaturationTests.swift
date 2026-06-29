@@ -33,11 +33,11 @@ final class SaturationTests: XCTestCase {
             let metrics = analyzeSignal(buffer, sampleRate: sampleRate, frequency: frequency)
 
             if let previous = previousRMS {
-                // The saturation stage's trim broadly maintains output level across
-                // drive settings, but the downstream compander re-levels the signal,
-                // so check that RMS stays within a modest band rather than asserting
-                // strict monotonicity.
-                XCTAssertEqual(metrics.rms, previous, accuracy: previous * 0.15, "Saturation trim should keep output RMS roughly constant across drive")
+                // Output RMS broadly increases with drive. The one exception is the
+                // small dip at 0 dB, where the saturation stage bypasses entirely
+                // and so loses the slight RMS boost the -12 dB trim adds; allow a
+                // modest tolerance to accommodate that bypass discontinuity.
+                XCTAssertGreaterThanOrEqual(metrics.rms, previous * 0.95, "Output RMS should not drop significantly as drive increases")
             }
             previousRMS = metrics.rms
             thdValues.append(metrics.thd)
