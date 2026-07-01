@@ -7,16 +7,14 @@ on:
 
 jobs:
   linux:
-    name: Linux (ubuntu-22.04)
-    # Pinned to 22.04: swift-actions/setup-swift@v1 does not support the
-    # Ubuntu 24.04 image that `ubuntu-latest` now resolves to.
-    runs-on: ubuntu-22.04
+    name: Linux (Swift 5.9)
+    runs-on: ubuntu-latest
+    # Use the official Swift toolchain image instead of swift-actions/setup-swift,
+    # which is unmaintained and now fails on current runners (no Ubuntu 24.04
+    # support, and a broken GPG key-import step on 22.04).
+    container: swift:5.9
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Swift
-        uses: swift-actions/setup-swift@v1
-        with:
-          swift-version: "5.9"
       - name: Build
         run: swift build --build-tests
       - name: Test

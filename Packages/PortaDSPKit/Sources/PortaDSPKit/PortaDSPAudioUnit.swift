@@ -2,12 +2,9 @@
 import AudioToolbox
 import AVFoundation
 import Foundation
-
-// Provide a local alias for the opaque DSP handle if not provided by the C headers
-// This matches the typical pattern of an opaque C pointer handle.
-#if !canImport(PortaDSPCHandleTypes)
-public typealias porta_dsp_handle = OpaquePointer
-#endif
+// The C bridge target supplies the porta_* render functions and the
+// `porta_dsp_handle` type, mirroring PortaDSPWrapper.swift.
+import PortaDSPBridge
 
 public enum PortaDSPAudioUnitError: Error {
     case failedToCreateEngineNode
@@ -415,7 +412,7 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
     public override func allocateRenderResources() throws {
         try super.allocateRenderResources()
         guard inputBus.format.channelCount == outputBus.format.channelCount else {
-            throw AUAudioUnitError(.formatNotSupported)
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(kAudioUnitErr_FormatNotSupported))
         }
         let channels = Int(outputBus.format.channelCount)
         let frames = Int(maximumFramesToRender)
@@ -625,7 +622,7 @@ public enum PortaDSPNodeFactory {
             throw error
         }
         guard let resolvedUnit = unit else {
-            throw AUAudioUnitError(.failedInitialization)
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(kAudioUnitErr_FailedInitialization))
         }
         return resolvedUnit
     }
