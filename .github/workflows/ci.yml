@@ -7,8 +7,10 @@ on:
 
 jobs:
   linux:
-    name: Linux (ubuntu-latest)
-    runs-on: ubuntu-latest
+    name: Linux (ubuntu-22.04)
+    # Pinned to 22.04: swift-actions/setup-swift@v1 does not support the
+    # Ubuntu 24.04 image that `ubuntu-latest` now resolves to.
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - name: Set up Swift

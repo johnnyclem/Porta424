@@ -576,6 +576,33 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
         }
         return result
     }
+
+    /// Audio component description identifying this unit to the component system
+    /// (effect type, subtype "P424", manufacturer "Jhnc").
+    public static let componentDescription = AudioComponentDescription(
+        componentType: OSType(kAudioUnitType_Effect),
+        componentSubType: PortaDSPAudioUnit.makeFourCC("P424"),
+        componentManufacturer: PortaDSPAudioUnit.makeFourCC("Jhnc"),
+        componentFlags: 0,
+        componentFlagsMask: 0
+    )
+
+    // Registers the subclass exactly once; lazy static initialization is
+    // thread-safe and runs its body a single time.
+    private static let registration: Void = {
+        AUAudioUnit.registerSubclass(
+            PortaDSPAudioUnit.self,
+            as: PortaDSPAudioUnit.componentDescription,
+            name: "Porta424: PortaDSP",
+            version: 0x0001_0000
+        )
+    }()
+
+    /// Registers `PortaDSPAudioUnit` with the Audio Unit component system so it
+    /// can be instantiated via `AVAudioUnit.instantiate(with:)`. Idempotent.
+    public static func register() {
+        _ = registration
+    }
 }
 
 public enum PortaDSPNodeFactory {
