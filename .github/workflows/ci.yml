@@ -7,11 +7,10 @@ on:
 
 jobs:
   linux:
-    name: Linux (Swift 5.9)
+    name: Linux (swift:5.9)
     runs-on: ubuntu-latest
-    # Use the official Swift toolchain image instead of swift-actions/setup-swift,
-    # which is unmaintained and now fails on current runners (no Ubuntu 24.04
-    # support, and a broken GPG key-import step on 22.04).
+    # Use the official Swift image so we don't depend on swift-actions/setup-swift,
+    # which has been unreliable (Ubuntu 24.04 unsupported, flaky GPG key import).
     container: swift:5.9
     steps:
       - uses: actions/checkout@v4

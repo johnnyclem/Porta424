@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Porta424 — Tape emulation you can play in the browser</title>
+  <meta name="description" content="Porta424 / PortaDSPKit — a real-time tape-emulation DSP for Swift, with a live Web Audio + Web MIDI demo of the 4-track cassette portastudio." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+</head>
+<body>
+
+  <!-- ===================== NAV ===================== -->
+  <header class="nav">
+    <div class="nav-inner">
+      <a class="brand" href="#top"><span class="brand-mark">●</span> Porta<strong>424</strong></a>
+      <nav class="nav-links">
+        <a href="#demo">Demo</a>
+        <a href="#features">Features</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#install">Install</a>
+        <a class="nav-gh" href="https://github.com/johnnyclem/Porta424" target="_blank" rel="noopener">GitHub ↗</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===================== HERO ===================== -->
+  <section class="hero" id="top">
+    <div class="hero-grain"></div>
+    <div class="hero-inner">
+      <p class="eyebrow">PortaDSPKit · Swift · C++17 · Web Audio</p>
+      <h1>The warmth of cassette,<br/><span class="accent">modeled sample-by-sample.</span></h1>
+      <p class="lede">
+        Porta424 faithfully recreates the wow, flutter, saturation, head bump and hiss of a
+        vintage 4-track portastudio. Ship it in your app as a Swift package — or
+        <strong>play the real DSP right here</strong>, running live in your browser via the
+        Web Audio &amp; Web MIDI APIs.
+      </p>
+      <div class="hero-cta">
+        <button class="btn btn-primary" data-scroll-demo>▶ Try the live demo</button>
+        <a class="btn btn-ghost" href="https://github.com/johnnyclem/Porta424" target="_blank" rel="noopener">View source</a>
+      </div>
+      <ul class="hero-stats">
+        <li><strong>13</strong> DSP modules</li>
+        <li><strong>0</strong> dependencies</li>
+        <li><strong>5</strong> factory presets</li>
+        <li><strong>AU</strong> ready</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===================== LIVE DEMO ===================== -->
+  <section class="demo" id="demo">
+    <div class="section-head">
+      <h2>Live demo — the deck, in your browser</h2>
+      <p>The same tape character DSP, ported to an <code>AudioWorklet</code>. Play the synth with
+        your computer keys, a MIDI controller, your mic, or a dropped audio file.</p>
+    </div>
+
+    <div class="demo-deck" data-transport="stopped">
+      <!-- top chrome -->
+      <div class="deck-top">
+        <div class="deck-brand">
+          <span class="deck-screw"></span>
+          PORTA <b>424</b> <em>portastudio</em>
+          <span class="deck-screw"></span>
+        </div>
+        <div class="deck-power">
+          <span id="dsp-badge" class="dsp-badge">powered off</span>
+          <button id="power-btn" class="power-btn" aria-pressed="false">POWER</button>
+        </div>
+      </div>
+
+      <!-- cassette window + transport + counter -->
+      <div class="deck-transport-zone">
+        <div class="cassette">
+          <div class="reel"><div class="reel-core"></div></div>
+          <div class="tape-window"><div class="led-counter" id="tape-counter">00:00</div></div>
+          <div class="reel"><div class="reel-core"></div></div>
+        </div>
+        <div class="transport">
+          <button id="t-rec" class="t-btn rec" title="Record" aria-label="Record">●</button>
+          <button id="t-play" class="t-btn play" title="Play" aria-label="Play">▶</button>
+          <button id="t-stop" class="t-btn stop" title="Stop" aria-label="Stop">■</button>
+          <button id="bypass-btn" class="bypass-btn">TAPE: ENGAGED</button>
+        </div>
+      </div>
+
+      <!-- mixer + tape character -->
+      <div class="deck-body">
+        <div class="mixer">
+          <div class="panel-label">6-CHANNEL MIXER</div>
+          <div class="mixer-strips" id="mixer-strips"><!-- generated --></div>
+        </div>
+
+        <div class="tape-section">
+          <div class="panel-label">TAPE CHARACTER</div>
+          <div class="tape-knobs" id="tape-knobs"><!-- generated --></div>
+
+          <div class="master">
+            <div class="master-vu"><div id="master-vu-fill" class="vu-fill"></div></div>
+            <div class="io-knobs" id="io-knobs"><!-- input/master --></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- presets -->
+      <div class="deck-presets">
+        <div class="panel-label">FACTORY PRESETS</div>
+        <div class="preset-row" id="preset-row"><!-- generated --></div>
+      </div>
+
+      <!-- sources + keyboard -->
+      <div class="deck-sources">
+        <div class="source-buttons">
+          <button id="midi-btn" class="src-btn">⌥ Connect MIDI</button>
+          <button id="mic-btn" class="src-btn">🎙 Use mic</button>
+          <button id="file-btn" class="src-btn">📂 Load audio</button>
+          <input id="file-input" type="file" accept="audio/*" hidden />
+        </div>
+        <div class="source-hints">
+          <span id="midi-status">MIDI: not connected</span>
+          <span id="mic-hint"></span>
+          <span id="file-hint">Tip: drag &amp; drop an audio file onto the deck.</span>
+        </div>
+        <div class="keyboard" id="keyboard" role="group" aria-label="On-screen keyboard"><!-- generated --></div>
+        <p class="kbd-tip">Computer keys <kbd>A</kbd> <kbd>W</kbd> <kbd>S</kbd> <kbd>E</kbd> <kbd>D</kbd>… play notes too.</p>
+      </div>
+    </div>
+
+    <p class="demo-foot">No audio? Browsers require a click before sound can start — hit <b>POWER</b> first.
+      The real Swift/C++ build runs the identical algorithms natively on iOS &amp; macOS.</p>
+  </section>
+
+  <!-- ===================== FEATURES ===================== -->
+  <section class="features" id="features">
+    <div class="section-head"><h2>13 DSP modules, zero dependencies</h2>
+      <p>Every imperfection that made cassette desirable, modeled in a real-time C++17 core.</p></div>
+    <div class="feature-grid">
+      <div class="feature"><h3>Wow &amp; Flutter</h3><p>Independent sine LFOs through a modulated fractional delay line, with slow random phase drift.</p></div>
+      <div class="feature"><h3>Saturation</h3><p><code>tanh</code> soft-clip with calibrated drive and makeup gain for warm, musical compression.</p></div>
+      <div class="feature"><h3>Head Bump</h3><p>Resonant low-frequency peak (~80 Hz, Q 1.4) recreating analog tape’s signature thump.</p></div>
+      <div class="feature"><h3>Tape Hiss</h3><p>Gently colored additive noise, dialed in decibels-full-scale from silent to lo-fi.</p></div>
+      <div class="feature"><h3>Dropouts</h3><p>Random, smoothed amplitude dips per minute — the sound of worn oxide.</p></div>
+      <div class="feature"><h3>Bandwidth / HF Loss</h3><p>Tunable low-pass roll-off from a bright 20 kHz down to a dusty 1 kHz.</p></div>
+      <div class="feature"><h3>Crosstalk &amp; Azimuth</h3><p>Inter-channel bleed and timing jitter between tracks for true multitrack realism.</p></div>
+      <div class="feature"><h3>Compander &amp; EQ</h3><p>Noise-reduction encode/decode and parametric biquad EQ on every channel.</p></div>
+      <div class="feature"><h3>Metering</h3><p>RMS level metering taps for VU displays, thread-safe from the audio thread.</p></div>
+    </div>
+    <div class="badges">
+      <span class="pill">Audio Unit ready</span>
+      <span class="pill">Thread-safe atomics</span>
+      <span class="pill">iOS 17 · macOS 14 · Linux</span>
+      <span class="pill">.portapreset JSON</span>
+    </div>
+  </section>
+
+  <!-- ===================== ARCHITECTURE ===================== -->
+  <section class="architecture" id="architecture">
+    <div class="section-head"><h2>How the signal flows</h2>
+      <p>Native nodes handle EQ &amp; filtering; the custom tape physics live in an AudioWorklet —
+        the same split the native build uses between Swift and the C++ core.</p></div>
+    <div class="flow">
+      <div class="flow-node">Source<small>synth · mic · file</small></div><span class="flow-arrow">→</span>
+      <div class="flow-node">Channel strip<small>trim · 3-band EQ · pan · fader</small></div><span class="flow-arrow">→</span>
+      <div class="flow-node accent">Tape worklet<small>wow/flutter · sat · hiss · dropouts</small></div><span class="flow-arrow">→</span>
+      <div class="flow-node">Head bump<small>peaking biquad</small></div><span class="flow-arrow">→</span>
+      <div class="flow-node">Bandwidth<small>lowpass</small></div><span class="flow-arrow">→</span>
+      <div class="flow-node">Master<small>gain · VU · out</small></div>
+    </div>
+  </section>
+
+  <!-- ===================== INSTALL ===================== -->
+  <section class="install" id="install">
+    <div class="section-head"><h2>Drop it into your app</h2>
+      <p>Swift Package Manager. No Homebrew, CocoaPods, or Carthage.</p></div>
+    <div class="code-cols">
+      <pre class="code"><code><span class="c-com">// Package.swift</span>
+<span class="c-kw">dependencies</span>: [
+  .package(url: <span class="c-str">"https://github.com/johnnyclem/Porta424.git"</span>, from: <span class="c-str">"1.0.0"</span>)
+]</code></pre>
+      <pre class="code"><code><span class="c-kw">import</span> AVFoundation
+<span class="c-kw">import</span> PortaDSPKit
+
+<span class="c-kw">var</span> params = PortaDSP.Params()
+params.satDriveDb     = <span class="c-num">-2.0</span>   <span class="c-com">// push saturation</span>
+params.headBumpGainDb = <span class="c-num">4.0</span>    <span class="c-com">// warm low end</span>
+params.hissLevelDbFS  = <span class="c-num">-54.0</span>  <span class="c-com">// audible hiss</span>
+
+<span class="c-kw">let</span> porta = PortaDSP()
+porta.update(params)</code></pre>
+    </div>
+  </section>
+
+  <!-- ===================== FOOTER ===================== -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <span>Porta<strong>424</strong> · PortaDSPKit</span>
+      <span class="footer-mid">Tape emulation DSP for Swift — &copy; <span id="year">2026</span></span>
+      <a href="https://github.com/johnnyclem/Porta424" target="_blank" rel="noopener">github.com/johnnyclem/Porta424 ↗</a>
+    </div>
+  </footer>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
