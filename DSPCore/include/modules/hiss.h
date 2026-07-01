@@ -53,6 +53,10 @@ inline void Hiss::updateTiltNormalization() {
 inline void Hiss::prepare(float sampleRate, int maxChannels) {
     (void)sampleRate;
     channels_.assign(std::max(maxChannels, 1), ChannelState{});
+    // Re-seed deterministically so two freshly-prepared instances with the same
+    // configuration produce identical hiss. (The constructor seeds from
+    // random_device for standalone, non-prepared use.)
+    setSeed(0x9E3779B97F4A7C15ULL);
     reset();
 }
 

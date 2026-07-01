@@ -2,16 +2,13 @@
 import AudioToolbox
 import AVFoundation
 import Foundation
-
-// Provide a local alias for the opaque DSP handle if not provided by the C headers
-// This matches the typical pattern of an opaque C pointer handle.
-#if !canImport(PortaDSPCHandleTypes)
-public typealias porta_dsp_handle = OpaquePointer
-#endif
+import PortaDSPBridge
 
 public enum PortaDSPAudioUnitError: Error {
     case failedToCreateEngineNode
     case unsupportedPlatform
+    case formatNotSupported
+    case failedInitialization
 }
 
 public final class PortaDSPAudioUnit: AUAudioUnit {
@@ -216,7 +213,7 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
     private var outputBusArray: AUAudioUnitBusArray!
     private var interleavedScratch: UnsafeMutablePointer<Float>?
     private var scratchCapacity: Int = 0
-    private var dspHandle: porta_dsp_handle?
+    private var dspHandle: PortaDSPBridge.porta_dsp_handle?
     private var lastParams = PortaDSP.Params()
     private lazy var internalFactoryPresets: [AUAudioUnitPreset] = {
         PortaPreset.factoryPresets.enumerated().map { index, preset in
@@ -258,7 +255,6 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
         parameterMap = map
         let orderedParameters = ParameterID.allCases.compactMap { map[$0] }
         parameterTreeImpl = AUParameterTree.createTree(withChildren: orderedParameters)
-        self.parameterTree = parameterTreeImpl
 
         let defaultFormat = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
@@ -269,12 +265,23 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
         inputBus = try AUAudioUnitBus(format: defaultFormat)
         outputBus = try AUAudioUnitBus(format: defaultFormat)
         try super.init(componentDescription: componentDescription, options: options)
+        // `parameterTree` is an inherited AUAudioUnit property, so it can only be
+        // assigned after super.init.
+        self.parameterTree = parameterTreeImpl
         maximumFramesToRender = 4096
         inputBusArray = AUAudioUnitBusArray(audioUnit: self, busType: .input, busses: [inputBus])
         outputBusArray = AUAudioUnitBusArray(audioUnit: self, busType: .output, busses: [outputBus])
         parameterObserverToken = parameterTreeImpl.token(byAddingParameterObserver: { [weak self] address, value in
             self?.handleParameterChange(address: address, value: value)
         })
+        // Token observers are delivered asynchronously, so they cannot be relied
+        // on to mirror host/automation edits into the cached params and DSP.
+        // implementorValueObserver is invoked synchronously whenever a parameter
+        // value is set through the tree, which is what an AU should use to store
+        // parameter values into its implementation.
+        parameterTreeImpl.implementorValueObserver = { [weak self] parameter, value in
+            self?.handleParameterChange(address: parameter.address, value: value)
+        }
     }
 
     deinit {
@@ -415,7 +422,7 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
     public override func allocateRenderResources() throws {
         try super.allocateRenderResources()
         guard inputBus.format.channelCount == outputBus.format.channelCount else {
-            throw AUAudioUnitError(.formatNotSupported)
+            throw PortaDSPAudioUnitError.formatNotSupported
         }
         let channels = Int(outputBus.format.channelCount)
         let frames = Int(maximumFramesToRender)
@@ -576,6 +583,35 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
         }
         return result
     }
+
+    // MARK: Audio Component Registration
+
+    /// The audio component description used to register and instantiate this unit.
+    public static let componentDescription: AudioComponentDescription = {
+        var description = AudioComponentDescription()
+        description.componentType = kAudioUnitType_Effect
+        description.componentSubType = makeFourCC("P424")
+        description.componentManufacturer = makeFourCC("Tsc4")
+        description.componentFlags = 0
+        description.componentFlagsMask = 0
+        return description
+    }()
+
+    // Lazily registers the subclass exactly once (static `let` is thread-safe
+    // and evaluated at most one time).
+    private static let registrationToken: Void = {
+        AUAudioUnit.registerSubclass(
+            PortaDSPAudioUnit.self,
+            as: PortaDSPAudioUnit.componentDescription,
+            name: "Porta424: PortaDSP",
+            version: 1
+        )
+    }()
+
+    /// Registers this audio unit with the component system. Safe to call repeatedly.
+    public static func register() {
+        _ = registrationToken
+    }
 }
 
 public enum PortaDSPNodeFactory {
@@ -598,7 +634,7 @@ public enum PortaDSPNodeFactory {
             throw error
         }
         guard let resolvedUnit = unit else {
-            throw AUAudioUnitError(.failedInitialization)
+            throw PortaDSPAudioUnitError.failedInitialization
         }
         return resolvedUnit
     }
@@ -609,6 +645,8 @@ import Foundation
 public enum PortaDSPAudioUnitError: Error {
     case failedToCreateEngineNode
     case unsupportedPlatform
+    case formatNotSupported
+    case failedInitialization
 }
 
 public struct AudioComponentDescription: Sendable {
