@@ -8,19 +8,13 @@ import Darwin
 final class PortaDSPAudioUnitRenderTests: XCTestCase {
     private let accuracy: Float = 1.0e-6
 
-    func testInterleavedRenderingProducesExpectedSamples() throws {
-        let frameSizes = [1, 2, 7, 64]
-        for channels in 1...2 {
-            for frames in frameSizes {
-                try assertRenderMatchesExpected(
-                    channels: channels,
-                    frames: frames,
-                    interleaved: true,
-                    bypass: false,
-                    offline: false
-                )
-            }
-        }
+    func testInterleavedFormatIsRejected() {
+        // AUAudioUnit buses are non-interleaved, so configuring an interleaved
+        // format must be rejected. The rendering tests below all use planar
+        // (deinterleaved) formats accordingly.
+        XCTAssertThrowsError(
+            try makeConfiguredUnit(channels: 2, interleaved: true, maximumFrames: 64)
+        )
     }
 
     func testPlanarRenderingProducesExpectedSamples() throws {
@@ -38,22 +32,8 @@ final class PortaDSPAudioUnitRenderTests: XCTestCase {
         }
     }
 
-    func testBypassLeavesInterleavedBufferUnmodified() throws {
-        try assertRenderMatchesExpected(channels: 2, frames: 16, interleaved: true, bypass: true, offline: false)
-    }
-
     func testBypassLeavesPlanarBufferUnmodified() throws {
         try assertRenderMatchesExpected(channels: 2, frames: 16, interleaved: false, bypass: true, offline: false)
-    }
-
-    func testOfflineInterleavedRenderingMatchesExpectedSamples() throws {
-        try assertRenderMatchesExpected(
-            channels: 2,
-            frames: 32,
-            interleaved: true,
-            bypass: false,
-            offline: true
-        )
     }
 
     func testOfflinePlanarRenderingMatchesExpectedSamples() throws {
@@ -70,19 +50,19 @@ final class PortaDSPAudioUnitRenderTests: XCTestCase {
         let channels = 2
         let maxFrames: AUAudioFrameCount = 32
 
-        let unit = try makeConfiguredUnit(channels: channels, interleaved: true, maximumFrames: maxFrames)
+        let unit = try makeConfiguredUnit(channels: channels, interleaved: false, maximumFrames: maxFrames)
         defer { unit.deallocateRenderResources() }
 
         let validFrames = Int(maxFrames)
-        var validBuffers = makeAudioBufferList(frames: validFrames, channels: channels, interleaved: true)
-        defer { deallocateAudioBufferList(&validBuffers, interleaved: true, frames: validFrames, channels: channels) }
+        var validBuffers = makeAudioBufferList(frames: validFrames, channels: channels, interleaved: false)
+        defer { deallocateAudioBufferList(&validBuffers, interleaved: false, frames: validFrames, channels: channels) }
 
         let pullSamples = makeChannelSamples(frames: validFrames, channels: channels)
 
         let pullBlock: AURenderPullInputBlock = { flags, timestamp, frameCount, busNumber, data in
             XCTAssertEqual(frameCount, maxFrames)
             XCTAssertEqual(busNumber, 0)
-            self.write(samples: pullSamples, to: data, interleaved: true, frames: validFrames, channels: channels)
+            self.write(samples: pullSamples, to: data, interleaved: false, frames: validFrames, channels: channels)
             return noErr
         }
 
@@ -94,8 +74,8 @@ final class PortaDSPAudioUnitRenderTests: XCTestCase {
         XCTAssertEqual(okStatus, noErr)
 
         let oversizedFrames = Int(maxFrames + 1)
-        var oversizedBuffers = makeAudioBufferList(frames: oversizedFrames, channels: channels, interleaved: true)
-        defer { deallocateAudioBufferList(&oversizedBuffers, interleaved: true, frames: oversizedFrames, channels: channels) }
+        var oversizedBuffers = makeAudioBufferList(frames: oversizedFrames, channels: channels, interleaved: false)
+        defer { deallocateAudioBufferList(&oversizedBuffers, interleaved: false, frames: oversizedFrames, channels: channels) }
 
         var oversizedPullInvoked = false
         let oversizedPull: AURenderPullInputBlock = { _, _, _, _, _ in

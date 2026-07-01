@@ -274,6 +274,14 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
         parameterObserverToken = parameterTreeImpl.token(byAddingParameterObserver: { [weak self] address, value in
             self?.handleParameterChange(address: address, value: value)
         })
+        // Token observers are delivered asynchronously, so they cannot be relied
+        // on to mirror host/automation edits into the cached params and DSP.
+        // implementorValueObserver is invoked synchronously whenever a parameter
+        // value is set through the tree, which is what an AU should use to store
+        // parameter values into its implementation.
+        parameterTreeImpl.implementorValueObserver = { [weak self] parameter, value in
+            self?.handleParameterChange(address: parameter.address, value: value)
+        }
     }
 
     deinit {
