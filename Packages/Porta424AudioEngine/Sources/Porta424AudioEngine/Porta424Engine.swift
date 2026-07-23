@@ -112,9 +112,6 @@ public final class Porta424Engine: ObservableObject {
 
     private let cueMix = AVAudioMixerNode()
 
-    /// Dedicated meter nodes so record taps never clobber metering.
-    private let meterBusses: [AVAudioMixerNode] = (0..<4).map { _ in AVAudioMixerNode() }
-
     private let trackPlayers: [AVAudioPlayerNode] = (0..<4).map { _ in AVAudioPlayerNode() }
     private let trackRecordBusses: [AVAudioMixerNode] = (0..<4).map { _ in AVAudioMixerNode() }
 
@@ -122,7 +119,12 @@ public final class Porta424Engine: ObservableObject {
     private var meterTaps: [MeterTap] = []
 
     private var placeholderSources: [Int: AVAudioNode] = [:]
+    /// Live mic (or silent) gain into each of strips 1–4.
     private var inputGains: [AVAudioMixerNode] = []
+    /// Tape repro gain into each of strips 1–4 (muted while that track is recording).
+    private var tapeReturnGains: [AVAudioMixerNode] = []
+    /// Sums live + tape before each strip's preGain.
+    private var stripSourceSums: [AVAudioMixerNode] = []
 
     private var portaNode: AVAudioUnit?
     private var portaDSP: PortaDSPAudioUnit?
@@ -270,7 +272,6 @@ public final class Porta424Engine: ObservableObject {
         [groupL, groupR, groupStereo, masterMix, phonesMix, fx1SendMix, fx2SendMix, fxReturnMix, cueMix].forEach {
             engine.attach($0)
         }
-        meterBusses.forEach { engine.attach($0) }
         engine.attach(fx1)
         engine.attach(fx2)
         trackPlayers.forEach { engine.attach($0) }
@@ -291,22 +292,29 @@ public final class Porta424Engine: ObservableObject {
             engine.attach(g)
             return g
         }
+        tapeReturnGains = (0..<4).map { _ in
+            let g = AVAudioMixerNode()
+            engine.attach(g)
+            return g
+        }
+        stripSourceSums = (0..<4).map { _ in
+            let s = AVAudioMixerNode()
+            engine.attach(s)
+            return s
+        }
 
-        // One consistent stereo format for the whole graph. Mixing sample rates /
-        // channel counts is what triggers AVAudioEngine's isInputConnToConverter crash.
+        // One consistent stereo format for the whole graph.
         let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2)!
         processingFormat = format
 
-        // Install PortaDSP on stereo bus: groupStereo → tape → masterMix
+        // Install PortaDSP on stereo bus: groupStereo → tape color → masterMix
         let (node, unit) = try await installPortaNode()
         portaNode = node
         portaDSP = unit
         unit.updateParameters(lastTapeParams)
         engine.attach(node)
 
-        // Live input fan-out. Hardware mic is attached *after* the engine starts
-        // (connecting inputNode before initialize frequently trips
-        // isInputConnToConverter on Simulator / mismatched HW formats).
+        // Live input fan-out (silent on Simulator; device may attach HW later).
         let inputSplit = AVAudioMixerNode()
         engine.attach(inputSplit)
         let liveSilent = AVAudioMixerNode()
@@ -315,9 +323,16 @@ public final class Porta424Engine: ObservableObject {
         engine.connect(liveSilent, to: inputSplit, format: format)
         self.liveInputSplit = inputSplit
 
+        // Tracks 1–4: live + tape repro → strip (Portastudio tape return through mixer).
         for i in 0..<4 {
             engine.connect(inputSplit, to: inputGains[i], format: format)
-            stripNodes[i].connectSource(inputGains[i], format: format, to: engine)
+            engine.connect(inputGains[i], to: stripSourceSums[i], format: format)
+
+            engine.connect(trackPlayers[i], to: tapeReturnGains[i], format: format)
+            engine.connect(tapeReturnGains[i], to: stripSourceSums[i], format: format)
+            // Headphones tape cue still available from strip cue send (after EQ).
+
+            stripNodes[i].connectSource(stripSourceSums[i], format: format, to: engine)
         }
 
         let silentSource5 = AVAudioMixerNode()
@@ -345,11 +360,6 @@ public final class Porta424Engine: ObservableObject {
         engine.connect(groupL, to: groupStereo, format: format)
         engine.connect(groupR, to: groupStereo, format: format)
 
-        for player in trackPlayers {
-            engine.connect(player, to: groupStereo, format: format)
-            engine.connect(player, to: cueMix, format: format)
-        }
-
         fx1.loadFactoryPreset(.mediumHall)
         fx1.wetDryMix = 100
         fx2.delayTime = 0.35
@@ -371,9 +381,13 @@ public final class Porta424Engine: ObservableObject {
         engine.connect(phonesMix, to: varispeed, format: format)
         engine.connect(varispeed, to: engine.outputNode, format: format)
 
+        // Record busses start on SAFE (rewireRecordBusses applies real routes).
         for i in 0..<4 {
-            engine.connect(groupStereo, to: trackRecordBusses[i], format: format)
-            engine.connect(groupStereo, to: meterBusses[i], format: format)
+            let silent = AVAudioMixerNode()
+            silent.outputVolume = 0
+            engine.attach(silent)
+            safeSinks[i] = silent
+            engine.connect(silent, to: trackRecordBusses[i], format: format)
         }
 
         installMeterTaps(format: format)
@@ -425,8 +439,9 @@ public final class Porta424Engine: ObservableObject {
 
     private func installMeterTaps(format: AVAudioFormat) {
         meterTaps.forEach { $0.uninstall() }
+        // Per-track meters from strip post-fader (main), not the stereo bus.
         meterTaps = (0..<4).map { i in
-            MeterTap(node: meterBusses[i]) { [weak self] level in
+            MeterTap(node: stripNodes[i].main) { [weak self] level in
                 DispatchQueue.main.async {
                     self?.meters[i] = level
                 }
@@ -451,8 +466,20 @@ public final class Porta424Engine: ObservableObject {
         for (index, channel) in channels.enumerated() {
             updateStrip(index, channel)
         }
+        applyTapeReturnMutes()
         applyMaster()
         rewireRecordBusses()
+    }
+
+    /// Portastudio overdub hygiene: while recording, mute tape return on any track
+    /// that is not SAFE so it cannot reprint into the buss / direct path.
+    private func applyTapeReturnMutes() {
+        for i in 0..<min(4, tapeReturnGains.count) {
+            let ch = channels[i]
+            // recFunction != .safe is the arm switch on a real 424.
+            let shouldMuteReturn = transport.isRecording && ch.recFunction != .safe
+            tapeReturnGains[i].outputVolume = shouldMuteReturn ? 0 : 1
+        }
     }
 
     private func applyMaster() {
@@ -561,6 +588,7 @@ public final class Porta424Engine: ObservableObject {
         }
         transport.isPlaying = false
         transport.isPaused = false
+        applyTapeReturnMutes()
         stopPlayers(keepTime: false)
         updateCounterString()
     }
@@ -569,10 +597,12 @@ public final class Porta424Engine: ObservableObject {
         if transport.isRecording {
             stopRecordingIfNeeded()
             transport.isRecording = false
+            applyTapeReturnMutes()
         } else {
             transport.isRecording = true
             transport.isPlaying = true
             transport.isPaused = false
+            applyTapeReturnMutes()
             startPlayersFromCurrentPosition()
             startRecordingIfArmed()
         }

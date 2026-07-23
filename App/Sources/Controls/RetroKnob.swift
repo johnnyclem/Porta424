@@ -99,9 +99,12 @@ struct RetroKnob: View {
 
             if !title.isEmpty {
                 Text(title)
-                    .font(Porta.labelFont)
+                    .font(.system(size: max(7, min(9, size * 0.22)), weight: .bold, design: .rounded))
                     .foregroundStyle(Porta.label)
-                    .tracking(0.5)
+                    .tracking(0.3)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+                    .frame(maxWidth: size + 16)
             }
         }
     }

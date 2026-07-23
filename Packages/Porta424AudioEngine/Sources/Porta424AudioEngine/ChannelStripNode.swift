@@ -1,5 +1,11 @@
 import AVFoundation
 
+/// One Portastudio-style channel strip.
+///
+/// Source is expected to already be a sum of **live** + **tape return**
+/// (engine owns those mixers). Flow:
+/// `source → preGain → EQ → postEQ → main (fader/pan) → group L/R`
+/// with postEQ also feeding FX1/FX2/cue and DIRECT record.
 final class ChannelStripNode {
     let index: Int
     let isStereo: Bool
