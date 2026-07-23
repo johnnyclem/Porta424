@@ -1,120 +1,104 @@
 import Foundation
-#if canImport(AVFoundation)
-import AVFoundation
-#endif
+import Porta424AudioEngine
 import PortaDSPKit
 
-/// Thread-safe audio engine actor managing the PortaDSP processing pipeline.
-/// Handles audio session setup, real-time DSP processing, and meter reading.
-actor AudioEngineActor {
+/// Main-actor façade over `Porta424Engine`: real mixer, transport, record/play, and tape DSP.
+@MainActor
+final class AudioEngineActor {
 
-    // MARK: - State
-    #if canImport(AVFoundation)
-    private var engine: AVAudioEngine?
-    private var portaUnit: AVAudioUnit?
-    #endif
-    private var dsp: PortaDSP?
+    private let deck = Porta424Engine()
     private var isRunning = false
     private var meterPollTask: Task<Void, Never>?
-
-    // Callback for meter updates
     private var onMeters: (@Sendable ([Float]) -> Void)?
 
     // MARK: - Lifecycle
 
     func start(onMeters: @escaping @Sendable ([Float]) -> Void) async throws {
         guard !isRunning else { return }
-
         self.onMeters = onMeters
-
-        #if canImport(AVFoundation)
-        #if os(iOS)
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord, options: [.defaultToSpeaker, .allowBluetooth])
-        try session.setPreferredSampleRate(48_000)
-        try session.setActive(true)
-        #endif
-
-        let engine = AVAudioEngine()
-        self.engine = engine
-
-        // Create DSP instance
-        let dsp = PortaDSP(sampleRate: 48_000, maxBlock: 512, tracks: 2)
-        self.dsp = dsp
-        dsp.update(PortaDSP.Params())
-
-        // Create PortaDSP Audio Unit node via async wrapper
-        let node: AVAudioUnit = try await withCheckedThrowingContinuation { continuation in
-            PortaDSPAudioUnit.makeEngineNode(engine: engine) { unit, _, error in
-                if let unit {
-                    continuation.resume(returning: unit)
-                } else {
-                    continuation.resume(throwing: error ?? NSError(domain: "Porta424", code: -1))
-                }
-            }
-        }
-
-        engine.attach(node)
-        let inputFormat = engine.inputNode.inputFormat(forBus: 0)
-        engine.connect(engine.inputNode, to: node, format: inputFormat)
-        engine.connect(node, to: engine.mainMixerNode, format: inputFormat)
-        self.portaUnit = node
-
-        try engine.start()
+        try await deck.start()
         isRunning = true
-
-        // Start meter polling at ~30Hz
         startMeterPolling()
-        #endif
     }
 
     func stop() {
         meterPollTask?.cancel()
         meterPollTask = nil
-        #if canImport(AVFoundation)
-        engine?.stop()
-        engine = nil
-        portaUnit = nil
-        #endif
-        dsp = nil
+        deck.stopEngine()
         isRunning = false
     }
 
-    // MARK: - Parameter Updates
+    var running: Bool { isRunning }
+
+    // MARK: - Tape DSP
 
     func updateDSP(_ state: DSPState) {
-        let params = state.toParams()
-        #if canImport(AudioToolbox)
-        if let unit = portaUnit as? PortaDSPAudioUnit {
-            unit.updateParameters(params)
-            return
-        }
-        #endif
-        dsp?.update(params)
+        deck.setTapeParams(state.toParams())
     }
 
     func applyPreset(_ params: PortaDSP.Params) {
-        #if canImport(AudioToolbox)
-        if let unit = portaUnit as? PortaDSPAudioUnit {
-            unit.updateParameters(params)
-            return
-        }
-        #endif
-        dsp?.update(params)
+        deck.setTapeParams(params)
     }
 
-    // MARK: - Volume Control
+    // MARK: - Mixer
 
-    func setMasterVolume(_ volume: Float) {
-        #if canImport(AVFoundation)
-        engine?.mainMixerNode.outputVolume = volume
-        #endif
+    func setChannels(_ board: [ChannelState]) {
+        deck.setChannels(MixerMapping.engineChannels(from: board))
     }
 
-    func setInputGain(_ gain: Float) {
-        #if os(iOS)
-        try? AVAudioSession.sharedInstance().setInputGain(gain)
-        #endif
+    func setMaster(volume: Double, pitch: Double) {
+        deck.setMaster(MixerMapping.engineMaster(volume: volume, pitch: pitch))
+    }
+
+    // MARK: - Transport
+
+    func transportPlayPause() {
+        deck.transportPlayPause()
+    }
+
+    func transportStop() {
+        deck.transportStop()
+    }
+
+    func transportRecordToggle() {
+        deck.transportRecordToggle()
+    }
+
+    func rewind(seconds: TimeInterval = 2.5) {
+        deck.rewind(seconds: seconds)
+    }
+
+    func fastForward(seconds: TimeInterval = 2.5) {
+        deck.fastForward(seconds: seconds)
+    }
+
+    func zeroCounter() {
+        deck.zeroCounter()
+    }
+
+    // MARK: - Snapshot for UI
+
+    struct Snapshot: Sendable {
+        var position: TimeInterval
+        var isPlaying: Bool
+        var isPaused: Bool
+        var isRecording: Bool
+        var counterString: String
+        var trackMeters: [Float]
+        var tapeMetersDbFS: [Float]
+    }
+
+    func snapshot() -> Snapshot {
+        let t = deck.transport
+        return Snapshot(
+            position: t.position,
+            isPlaying: t.isPlaying,
+            isPaused: t.isPaused,
+            isRecording: t.isRecording,
+            counterString: deck.counterString,
+            trackMeters: deck.meters,
+            tapeMetersDbFS: deck.readTapeMeters()
+        )
     }
 
     // MARK: - Metering
@@ -122,22 +106,15 @@ actor AudioEngineActor {
     private func startMeterPolling() {
         meterPollTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(33)) // ~30Hz
+                try? await Task.sleep(for: .milliseconds(33))
                 guard let self else { return }
-                await self.pollMeters()
+                self.pollMeters()
             }
         }
     }
 
     private func pollMeters() {
-        #if canImport(AudioToolbox)
-        guard let unit = portaUnit as? PortaDSPAudioUnit else { return }
-        let levels = unit.readMeters()
+        let levels = deck.readTapeMeters()
         onMeters?(levels)
-        #endif
     }
-
-    // MARK: - State
-
-    var running: Bool { isRunning }
 }

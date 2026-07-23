@@ -9,9 +9,9 @@ struct Porta424App: App {
         WindowGroup {
             Porta424BoardView()
                 .environmentObject(viewModel)
-                .onAppear {
+                .task {
                     do {
-                        try Porta424Engine.shared.start()
+                        try await Porta424Engine.shared.start()
                         viewModel.attachEngine(Porta424Engine.shared)
                     } catch {
                         print("Audio engine failed to start: \(error)")

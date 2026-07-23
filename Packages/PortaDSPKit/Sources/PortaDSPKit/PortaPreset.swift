@@ -16,6 +16,14 @@ public struct PortaPreset: Codable, Equatable, Sendable {
         self.parameters = parameters
     }
 
+    /// Build a serializable preset from the in-app / AU factory catalog.
+    public init(factory: PortaDSPPreset, author: String? = "PortaDSP") {
+        self.formatVersion = PortaPreset.currentFormatVersion
+        self.name = factory.name
+        self.author = author
+        self.parameters = factory.parameters
+    }
+
     enum CodingKeys: String, CodingKey {
         case formatVersion
         case name
@@ -45,91 +53,21 @@ public struct PortaPreset: Codable, Equatable, Sendable {
 }
 
 public extension PortaPreset {
-    static let factoryPresets: [PortaPreset] = [
-        .cleanCassette,
-        .warmBump,
-        .crunchySaturation,
-        .wobblyLoFi,
-        .noisyVHS
-    ]
-
-    static var cleanCassette: PortaPreset {
-        var params = PortaDSP.Params()
-        params.wowDepth = 0.0004
-        params.flutterDepth = 0.0002
-        params.headBumpGainDb = 2.5
-        params.headBumpFreqHz = 85.0
-        params.satDriveDb = -8.0
-        params.hissLevelDbFS = -70.0
-        params.lpfCutoffHz = 14000.0
-        params.azimuthJitterMs = 0.1
-        params.crosstalkDb = -75.0
-        params.dropoutRatePerMin = 0.1
-        params.nrTrack4Bypass = true
-        return PortaPreset(name: "Clean Cassette", author: "PortaDSP", parameters: params)
+    /// Single source of truth: mirrors `PortaDSPPreset.factoryPresets`.
+    static let factoryPresets: [PortaPreset] = PortaDSPPreset.factoryPresets.map {
+        PortaPreset(factory: $0)
     }
 
-    static var warmBump: PortaPreset {
-        var params = PortaDSP.Params()
-        params.wowDepth = 0.0007
-        params.flutterDepth = 0.00035
-        params.headBumpGainDb = 5.5
-        params.headBumpFreqHz = 70.0
-        params.satDriveDb = -3.0
-        params.hissLevelDbFS = -62.0
-        params.lpfCutoffHz = 12500.0
-        params.azimuthJitterMs = 0.2
-        params.crosstalkDb = -55.0
-        params.dropoutRatePerMin = 0.3
-        params.nrTrack4Bypass = false
-        return PortaPreset(name: "Warm Bump", author: "PortaDSP", parameters: params)
-    }
+    static var cleanCassette: PortaPreset { PortaPreset(factory: .cleanCassette) }
+    static var warmBump: PortaPreset { PortaPreset(factory: .warmBump) }
+    static var loFiWarble: PortaPreset { PortaPreset(factory: .loFiWarble) }
+    static var crunchySaturation: PortaPreset { PortaPreset(factory: .crunchySaturation) }
+    static var dustyArchive: PortaPreset { PortaPreset(factory: .dustyArchive) }
 
-    static var crunchySaturation: PortaPreset {
-        var params = PortaDSP.Params()
-        params.wowDepth = 0.0012
-        params.flutterDepth = 0.0008
-        params.headBumpGainDb = 6.0
-        params.headBumpFreqHz = 60.0
-        params.satDriveDb = 4.0
-        params.hissLevelDbFS = -52.0
-        params.lpfCutoffHz = 9500.0
-        params.azimuthJitterMs = 0.35
-        params.crosstalkDb = -48.0
-        params.dropoutRatePerMin = 1.6
-        params.nrTrack4Bypass = false
-        return PortaPreset(name: "Crunchy Saturation", author: "PortaDSP", parameters: params)
-    }
+    // Legacy aliases kept so older host code continues to compile.
+    @available(*, deprecated, renamed: "loFiWarble")
+    static var wobblyLoFi: PortaPreset { .loFiWarble }
 
-    static var wobblyLoFi: PortaPreset {
-        var params = PortaDSP.Params()
-        params.wowDepth = 0.0022
-        params.flutterDepth = 0.0015
-        params.headBumpGainDb = 3.0
-        params.headBumpFreqHz = 90.0
-        params.satDriveDb = -2.0
-        params.hissLevelDbFS = -58.0
-        params.lpfCutoffHz = 8000.0
-        params.azimuthJitterMs = 0.5
-        params.crosstalkDb = -50.0
-        params.dropoutRatePerMin = 1.2
-        params.nrTrack4Bypass = true
-        return PortaPreset(name: "Wobbly Lo-Fi", author: "PortaDSP", parameters: params)
-    }
-
-    static var noisyVHS: PortaPreset {
-        var params = PortaDSP.Params()
-        params.wowDepth = 0.0018
-        params.flutterDepth = 0.0011
-        params.headBumpGainDb = 1.5
-        params.headBumpFreqHz = 95.0
-        params.satDriveDb = -5.0
-        params.hissLevelDbFS = -45.0
-        params.lpfCutoffHz = 6500.0
-        params.azimuthJitterMs = 0.6
-        params.crosstalkDb = -42.0
-        params.dropoutRatePerMin = 2.5
-        params.nrTrack4Bypass = false
-        return PortaPreset(name: "Noisy VHS", author: "PortaDSP", parameters: params)
-    }
+    @available(*, deprecated, renamed: "dustyArchive")
+    static var noisyVHS: PortaPreset { .dustyArchive }
 }

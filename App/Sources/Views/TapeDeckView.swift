@@ -28,13 +28,24 @@ struct TapeDeckView: View {
             .onChange(of: viewModel.dsp) { _, _ in
                 viewModel.syncDSP()
             }
+            .onChange(of: viewModel.channels) { _, _ in
+                viewModel.syncMixer()
+            }
         }
+        #if os(iOS)
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
         .fullScreenCover(isPresented: $showMixer) {
             MixerBoardView(onClose: { showMixer = false })
                 .environment(viewModel)
         }
+        #else
+        .sheet(isPresented: $showMixer) {
+            MixerBoardView(onClose: { showMixer = false })
+                .environment(viewModel)
+                .frame(minWidth: 1000, minHeight: 640)
+        }
+        #endif
     }
 
     // MARK: - Landscape Layout (Primary - matches concept art)
@@ -212,7 +223,7 @@ struct TapeDeckView: View {
 
             // Cassette icon + mixer board entry
             HStack(spacing: 10) {
-                Image(systemName: "cassette.fill")
+                Image(systemName: "recordingtape")
                     .font(.system(size: 16))
                     .foregroundStyle(Porta.label.opacity(0.5))
 
@@ -254,21 +265,8 @@ struct TapeDeckView: View {
             Porta.chassis
                 .ignoresSafeArea()
 
-            // Subtle texture grain
-            Canvas { context, size in
-                // Gentle noise texture
-                for _ in 0..<300 {
-                    let x = Double.random(in: 0..<size.width)
-                    let y = Double.random(in: 0..<size.height)
-                    let opacity = Double.random(in: 0.01...0.04)
-                    context.fill(
-                        Path(CGRect(x: x, y: y, width: 1, height: 1)),
-                        with: .color(.black.opacity(opacity))
-                    )
-                }
-            }
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
+            Porta.ChassisGrain(density: 300, seed: 424)
+                .ignoresSafeArea()
 
             // Screw decorations in corners
             VStack {

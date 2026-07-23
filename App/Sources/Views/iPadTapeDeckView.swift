@@ -45,17 +45,28 @@ struct iPadTapeDeckView: View {
             .onChange(of: viewModel.dsp) { _, _ in
                 viewModel.syncDSP()
             }
+            .onChange(of: viewModel.channels) { _, _ in
+                viewModel.syncMixer()
+            }
             .onChange(of: isLandscape) { _, newValue in
                 // Auto-open drawer when rotating to landscape
                 if newValue { isDrawerOpen = true }
             }
         }
+        #if os(iOS)
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
         .fullScreenCover(isPresented: $showMixer) {
             MixerBoardView(onClose: { showMixer = false })
                 .environment(viewModel)
         }
+        #else
+        .sheet(isPresented: $showMixer) {
+            MixerBoardView(onClose: { showMixer = false })
+                .environment(viewModel)
+                .frame(minWidth: 1000, minHeight: 640)
+        }
+        #endif
     }
 
     // MARK: - Landscape Layout (Primary)
@@ -369,19 +380,8 @@ struct iPadTapeDeckView: View {
         ZStack {
             Porta.chassis.ignoresSafeArea()
 
-            Canvas { context, size in
-                for _ in 0..<400 {
-                    let x = Double.random(in: 0..<size.width)
-                    let y = Double.random(in: 0..<size.height)
-                    let opacity = Double.random(in: 0.01...0.04)
-                    context.fill(
-                        Path(CGRect(x: x, y: y, width: 1, height: 1)),
-                        with: .color(.black.opacity(opacity))
-                    )
-                }
-            }
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
+            Porta.ChassisGrain(density: 400, seed: 4241)
+                .ignoresSafeArea()
 
             // Corner screws (top only — bottom screws in main deck)
             VStack {

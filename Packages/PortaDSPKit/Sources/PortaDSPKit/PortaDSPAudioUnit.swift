@@ -503,7 +503,7 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
         for buffer in buffers {
             guard let data = buffer.mData else { continue }
             let count = samples * Int(buffer.mNumberChannels)
-            data.bindMemory(to: Float.self, capacity: count).assign(repeating: 0, count: count)
+            data.bindMemory(to: Float.self, capacity: count).update(repeating: 0, count: count)
         }
     }
 
@@ -512,7 +512,7 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
         let buffers = UnsafeMutableAudioBufferListPointer(list)
         guard let data = buffers.first?.mData else { return }
         let count = frames * channels
-        dest.assign(from: data.bindMemory(to: Float.self, capacity: count), count: count)
+        dest.update(from: data.bindMemory(to: Float.self, capacity: count), count: count)
     }
 
     private func copyPlanarBuffer(_ list: UnsafeMutablePointer<AudioBufferList>?, to dest: UnsafeMutablePointer<Float>, frames: Int, channels: Int) {
@@ -520,7 +520,7 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
         let buffers = UnsafeMutableAudioBufferListPointer(list)
         let bufferCount = buffers.count
         guard bufferCount > 0 else {
-            dest.assign(repeating: 0, count: frames * channels)
+            dest.update(repeating: 0, count: frames * channels)
             return
         }
         for channel in 0..<channels {
@@ -547,7 +547,7 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
         guard let list else { return }
         let buffers = UnsafeMutableAudioBufferListPointer(list)
         guard let data = buffers.first?.mData else { return }
-        data.bindMemory(to: Float.self, capacity: frames * channels).assign(from: source, count: frames * channels)
+        data.bindMemory(to: Float.self, capacity: frames * channels).update(from: source, count: frames * channels)
     }
 
     private func writePlanarBuffer(from source: UnsafeMutablePointer<Float>, to list: UnsafeMutablePointer<AudioBufferList>?, frames: Int, channels: Int) {
@@ -572,7 +572,7 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
     private func zeroChannel(_ buffer: AudioBuffer, frames: Int) {
         guard let data = buffer.mData else { return }
         let count = frames * Int(buffer.mNumberChannels)
-        data.bindMemory(to: Float.self, capacity: count).assign(repeating: 0, count: count)
+        data.bindMemory(to: Float.self, capacity: count).update(repeating: 0, count: count)
     }
 
     private static func makeFourCC(_ string: String) -> FourCharCode {
@@ -611,6 +611,37 @@ public final class PortaDSPAudioUnit: AUAudioUnit {
     /// Registers this audio unit with the component system. Safe to call repeatedly.
     public static func register() {
         _ = registrationToken
+    }
+
+    /// Instantiates an `AVAudioUnit` wrapping `PortaDSPAudioUnit` for use with `AVAudioEngine`.
+    ///
+    /// The completion handler receives:
+    /// - the engine node (`AVAudioUnit`) to attach/connect
+    /// - the underlying `PortaDSPAudioUnit` for parameter/meter control
+    /// - an error if instantiation failed
+    public static func makeEngineNode(
+        engine: AVAudioEngine,
+        options: AudioComponentInstantiationOptions = [],
+        completionHandler: @escaping (AVAudioUnit?, PortaDSPAudioUnit?, Error?) -> Void
+    ) {
+        _ = engine // Hosts typically hold the engine; keep signature stable for call sites.
+        register()
+        AVAudioUnit.instantiate(with: componentDescription, options: options) { avUnit, error in
+            if let error {
+                completionHandler(nil, nil, error)
+                return
+            }
+            guard let avUnit else {
+                completionHandler(nil, nil, PortaDSPAudioUnitError.failedToCreateEngineNode)
+                return
+            }
+            let dsp = avUnit.auAudioUnit as? PortaDSPAudioUnit
+            if dsp == nil {
+                completionHandler(avUnit, nil, PortaDSPAudioUnitError.failedInitialization)
+                return
+            }
+            completionHandler(avUnit, dsp, nil)
+        }
     }
 }
 

@@ -53,10 +53,18 @@ struct MixerBoardView: View {
             .padding(.vertical, 14)
         }
         .ignoresSafeArea(edges: .all)
+        #if os(iOS)
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
+        #endif
         .onChange(of: viewModel.dsp) { _, _ in
             viewModel.syncDSP()
+        }
+        .onChange(of: viewModel.channels) { _, _ in
+            viewModel.syncMixer()
+        }
+        .onChange(of: viewModel.pitch) { _, _ in
+            viewModel.syncMixer()
         }
     }
 
@@ -164,9 +172,9 @@ struct MixerBoardView: View {
 
             Spacer(minLength: 8)
 
-            // Pitch control
+            // Pitch control (varispeed — not bandwidth)
             RetroKnob(
-                value: Bindable(viewModel).dsp.bandwidth,
+                value: Bindable(viewModel).pitch,
                 title: "PITCH",
                 accentColor: Porta.flutterBlue,
                 size: 46,
@@ -205,19 +213,8 @@ struct MixerBoardView: View {
             Porta.chassis
                 .ignoresSafeArea()
 
-            Canvas { context, size in
-                for _ in 0..<300 {
-                    let x = Double.random(in: 0..<size.width)
-                    let y = Double.random(in: 0..<size.height)
-                    let opacity = Double.random(in: 0.01...0.04)
-                    context.fill(
-                        Path(CGRect(x: x, y: y, width: 1, height: 1)),
-                        with: .color(.black.opacity(opacity))
-                    )
-                }
-            }
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
+            Porta.ChassisGrain(density: 300, seed: 4242)
+                .ignoresSafeArea()
 
             VStack {
                 HStack {
@@ -346,12 +343,11 @@ private struct MixerChannelStrip: View {
         )
     }
 
-    /// A lively per-channel meter reading derived from the channel fader and the
-    /// shared transport level so the LED ladder dances while the tape rolls.
+    /// Per-channel meter from engine track levels (ch 1–4), scaled by fader.
     private var faderMeter: Double {
-        guard viewModel.isTransportActive else { return 0 }
-        let base = (viewModel.meterL + viewModel.meterR) / 2
-        return max(0, min(1, base * channel.level + Double.random(in: 0...0.05)))
+        let track = (index < viewModel.trackMeters.count) ? viewModel.trackMeters[index] : 0
+        let base = track > 0.001 ? track : (viewModel.meterL + viewModel.meterR) / 2
+        return max(0, min(1, base * channel.level))
     }
 }
 

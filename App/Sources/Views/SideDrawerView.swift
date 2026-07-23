@@ -173,7 +173,7 @@ struct SideDrawerView: View {
             signalArrow
             signalStage("DSP", icon: "waveform", color: Porta.flutterBlue)
             signalArrow
-            signalStage("TAPE", icon: "cassette.fill", color: Porta.saturationOrange)
+            signalStage("TAPE", icon: "recordingtape", color: Porta.saturationOrange)
             signalArrow
             signalStage("OUT", icon: "speaker.wave.2.fill", color: Porta.faderCapGreen)
         }
@@ -324,7 +324,7 @@ struct SideDrawerView: View {
 
             VStack(spacing: 2) {
                 tapeTypeRow("Type I — Normal (Fe₂O₃)", icon: "cassette", selected: true)
-                tapeTypeRow("Type II — Chrome (CrO₂)", icon: "cassette.fill", selected: false)
+                tapeTypeRow("Type II — Chrome (CrO₂)", icon: "recordingtape", selected: false)
                 tapeTypeRow("Type IV — Metal (Pure Metal)", icon: "opticaldisc.fill", selected: false)
             }
             .portaPanel(cornerRadius: 8)

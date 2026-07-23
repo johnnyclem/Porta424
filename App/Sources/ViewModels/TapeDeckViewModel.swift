@@ -3,8 +3,7 @@ import Observation
 import PortaDSPKit
 
 /// Main view model for the Porta424 tape deck interface.
-/// Uses Swift Observation (@Observable) for efficient SwiftUI updates
-/// and actor-isolated audio engine for thread safety.
+/// Mixer + transport are driven by `Porta424Engine` through `AudioEngineActor`.
 @MainActor
 @Observable
 final class TapeDeckViewModel {
@@ -12,14 +11,17 @@ final class TapeDeckViewModel {
     // MARK: - Published State
 
     var dsp = DSPState()
+    /// Tape speed / varispeed (0...1, center = 1.0×). Not a DSP bandwidth control.
+    var pitch: Double = 0.5
+
     var transportMode: TransportMode = .stopped
     var meterL: Double = 0
     var meterR: Double = 0
-    var tapePosition: Double = 0     // 0...1
+    /// Per-track meters 0...1 (channels 1–4).
+    var trackMeters: [Double] = [0, 0, 0, 0]
+    var tapePosition: Double = 0
     var counterSeconds: Double = 0
 
-    /// Six-channel mixer board state. UI-side mixer parameters (trim, EQ, pan,
-    /// channel faders) that mirror the hardware front panel.
     var channels: [ChannelState] = .defaultBoard
 
     var factoryPresets: [PresetItem] = []
@@ -27,124 +29,129 @@ final class TapeDeckViewModel {
     var activePresetId: String?
 
     var isEngineRunning = false
+    var engineError: String?
 
     // MARK: - Private
 
     private let engine = AudioEngineActor()
     private let presets = PresetManager()
-    private var transportTimer: Task<Void, Never>?
+    private var transportPollTask: Task<Void, Never>?
     private var dspSyncTask: Task<Void, Never>?
+    private var mixerSyncTask: Task<Void, Never>?
 
     // MARK: - Lifecycle
 
     func boot() async {
-        // Load presets
         factoryPresets = await presets.factoryPresets()
         userPresets = await presets.loadUserPresets()
 
-        // Start audio engine
         do {
             try await engine.start { [weak self] meters in
                 Task { @MainActor [weak self] in
                     guard let self else { return }
-                    self.meterL = Double(meters.count > 0 ? meters[0] : 0)
-                    self.meterR = Double(meters.count > 1 ? meters[1] : 0)
-                    // Normalize from dBFS (-60...0) to 0...1
-                    self.meterL = max(0, min(1, (self.meterL + 60) / 60))
-                    self.meterR = max(0, min(1, (self.meterR + 60) / 60))
+                    let l = meters.count > 0 ? meters[0] : -120
+                    let r = meters.count > 1 ? meters[1] : -120
+                    self.meterL = MixerMapping.normalizeDbFS(l)
+                    self.meterR = MixerMapping.normalizeDbFS(r)
                 }
             }
             isEngineRunning = true
-            await engine.updateDSP(dsp)
+            engineError = nil
+            engine.updateDSP(dsp)
+            engine.setChannels(channels)
+            engine.setMaster(volume: dsp.masterVolume, pitch: pitch)
         } catch {
+            isEngineRunning = false
+            engineError = error.localizedDescription
             print("Porta424: Audio engine failed to start: \(error)")
         }
 
-        // Load default preset
         if let first = factoryPresets.first {
             loadPreset(first)
         }
 
-        // Start transport timer
-        startTransportTimer()
+        startTransportPolling()
     }
 
     // MARK: - DSP Parameter Sync
 
-    /// Called when any DSP parameter changes. Debounces updates to the audio thread.
     func syncDSP() {
         dspSyncTask?.cancel()
-        dspSyncTask = Task {
+        dspSyncTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(16))
             guard !Task.isCancelled else { return }
-            await engine.updateDSP(dsp)
-            await engine.setMasterVolume(Float(dsp.masterVolume))
-            await engine.setInputGain(Float(dsp.inputGain))
+            engine.updateDSP(dsp)
+            engine.setMaster(volume: dsp.masterVolume, pitch: pitch)
+        }
+    }
+
+    /// Push mixer board state into the audio graph.
+    func syncMixer() {
+        mixerSyncTask?.cancel()
+        mixerSyncTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(16))
+            guard !Task.isCancelled else { return }
+            engine.setChannels(channels)
+            engine.setMaster(volume: dsp.masterVolume, pitch: pitch)
         }
     }
 
     // MARK: - Transport Controls
 
     func togglePlay() {
-        switch transportMode {
-        case .stopped, .paused:
-            transportMode = .playing
-            HapticEngine.transportTap()
-        case .playing:
-            transportMode = .paused
-            HapticEngine.transportTap()
-        case .recording:
-            transportMode = .playing
-            HapticEngine.transportTap()
-        case .rewinding, .fastForwarding:
-            transportMode = .playing
-            HapticEngine.transportTap()
-        }
+        engine.transportPlayPause()
+        refreshFromEngine()
+        HapticEngine.transportTap()
     }
 
     func stop() {
-        transportMode = .stopped
+        engine.transportStop()
+        refreshFromEngine()
         HapticEngine.transportTap()
     }
 
     func toggleRecord() {
+        engine.transportRecordToggle()
+        refreshFromEngine()
         if transportMode == .recording {
-            transportMode = .playing
-        } else {
-            transportMode = .recording
             HapticEngine.recordEngage()
+        } else {
+            HapticEngine.transportTap()
         }
     }
 
     func rewind() {
-        transportMode = .rewinding
+        engine.rewind()
+        refreshFromEngine()
         HapticEngine.transportTap()
     }
 
     func fastForward() {
-        transportMode = .fastForwarding
+        engine.fastForward()
+        refreshFromEngine()
         HapticEngine.transportTap()
     }
 
     func resetCounter() {
-        counterSeconds = 0
+        engine.zeroCounter()
+        refreshFromEngine()
         tapePosition = 0
     }
 
     // MARK: - Mixer Controls
 
-    /// Toggle the record-arm state of a mixer channel by its index (0-based).
     func toggleArm(channelIndex: Int) {
         guard channels.indices.contains(channelIndex) else { return }
         channels[channelIndex].isArmed.toggle()
         HapticEngine.buttonPress()
+        syncMixer()
     }
 
-    /// Toggle a channel's input source between MIC and LINE.
     func toggleSource(channelIndex: Int) {
         guard channels.indices.contains(channelIndex) else { return }
         channels[channelIndex].source.toggle()
         HapticEngine.buttonPress()
+        syncMixer()
     }
 
     // MARK: - Counter String
@@ -180,7 +187,8 @@ final class TapeDeckViewModel {
                 dsp = DSPState.from(params)
                 activePresetId = preset.id
             }
-            await engine.applyPreset(params)
+            engine.applyPreset(params)
+            engine.setMaster(volume: dsp.masterVolume, pitch: pitch)
         }
     }
 
@@ -196,43 +204,46 @@ final class TapeDeckViewModel {
         }
     }
 
-    // MARK: - Transport Timer
+    // MARK: - Engine polling
 
-    private func startTransportTimer() {
-        transportTimer = Task { [weak self] in
+    private func startTransportPolling() {
+        transportPollTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(33)) // ~30fps
+                try? await Task.sleep(for: .milliseconds(33))
                 guard let self else { return }
-                await self.tickTransport()
+                self.refreshFromEngine()
             }
         }
     }
 
-    private func tickTransport() async {
-        switch transportMode {
-        case .playing, .recording:
-            counterSeconds += 1.0 / 30.0
-            tapePosition = min(1, tapePosition + 0.00005)
-        case .rewinding:
-            counterSeconds = max(0, counterSeconds - 3.0 / 30.0)
-            tapePosition = max(0, tapePosition - 0.0002)
-        case .fastForwarding:
-            counterSeconds += 3.0 / 30.0
-            tapePosition = min(1, tapePosition + 0.0002)
-        case .stopped, .paused:
-            break
-        }
-
-        // Simulate meter falloff when not playing
-        if !isTransportActive {
+    private func refreshFromEngine() {
+        guard isEngineRunning else {
             meterL = max(0, meterL * 0.92 - 0.005)
             meterR = max(0, meterR * 0.92 - 0.005)
+            return
         }
 
-        // If engine isn't running, simulate meters
-        if !isEngineRunning && isTransportActive {
-            meterL = max(0.05, min(1, meterL * 0.9 + Double.random(in: 0.02...0.12)))
-            meterR = max(0.05, min(1, meterR * 0.9 + Double.random(in: 0.02...0.12)))
+        let snap = engine.snapshot()
+        counterSeconds = snap.position
+        transportMode = MixerMapping.transportMode(
+            isPlaying: snap.isPlaying,
+            isPaused: snap.isPaused,
+            isRecording: snap.isRecording
+        )
+
+        if snap.isPlaying && !snap.isPaused {
+            tapePosition = min(1, tapePosition + 0.00005)
+        }
+
+        if snap.tapeMetersDbFS.count >= 2 {
+            meterL = MixerMapping.normalizeDbFS(snap.tapeMetersDbFS[0])
+            meterR = MixerMapping.normalizeDbFS(snap.tapeMetersDbFS[1])
+        }
+
+        let count = min(4, snap.trackMeters.count)
+        if trackMeters.count < 4 { trackMeters = [0, 0, 0, 0] }
+        for i in 0..<count {
+            trackMeters[i] = Double(snap.trackMeters[i])
         }
     }
 }

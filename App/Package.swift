@@ -1,4 +1,4 @@
-// swift-tools-version:5.9
+// swift-tools-version: 6.0
 import PackageDescription
 
 let package = Package(
@@ -22,8 +22,10 @@ let package = Package(
                 .product(name: "Porta424AudioEngine", package: "Porta424AudioEngine")
             ],
             path: "Sources",
+            exclude: ["Info.plist", "Info-macOS.plist"],
+            resources: [],
             swiftSettings: [
-                .enableExperimentalFeature("StrictConcurrency")
+                .enableUpcomingFeature("StrictConcurrency")
             ]
         )
     ]

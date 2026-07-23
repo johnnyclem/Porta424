@@ -5,7 +5,8 @@ import PackageDescription
 let package = Package(
     name: "PortaDSPKit",
     platforms: [
-        .iOS(.v17), .macOS(.v14)
+        .iOS(.v17),
+        .macOS(.v14)
     ],
     products: [
         .library(name: "PortaDSPKit", targets: ["PortaDSPKit"]),
@@ -17,6 +18,8 @@ let package = Package(
             path: "Sources/PortaDSPBridge",
             publicHeadersPath: "include",
             cxxSettings: [
+                // DSP headers are pulled via relative #includes in portadsp_bridge.cpp
+                // (../../../../DSPCore/...). SPM forbids headerSearchPath outside the package root.
                 .define("PORTA_DSP_BRIDGE")
             ],
             linkerSettings: [

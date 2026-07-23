@@ -78,6 +78,57 @@ enum Porta {
         }
     }
 
+    /// Stable chassis grain — generated once per view identity so SwiftUI
+    /// redraws do not re-roll random dots every frame.
+    struct ChassisGrain: View {
+        var density: Int = 300
+        /// Unit-square samples (x, y, opacity) baked at init.
+        private let samples: [(CGFloat, CGFloat, Double)]
+
+        init(density: Int = 300, seed: UInt64 = 42) {
+            self.density = density
+            var rng = SeededGenerator(seed: seed)
+            samples = (0..<density).map { _ in
+                (
+                    CGFloat.random(in: 0..<1, using: &rng),
+                    CGFloat.random(in: 0..<1, using: &rng),
+                    Double.random(in: 0.01...0.04, using: &rng)
+                )
+            }
+        }
+
+        var body: some View {
+            Canvas { context, size in
+                for sample in samples {
+                    let x = Double(sample.0) * size.width
+                    let y = Double(sample.1) * size.height
+                    context.fill(
+                        Path(CGRect(x: x, y: y, width: 1, height: 1)),
+                        with: .color(.black.opacity(sample.2))
+                    )
+                }
+            }
+            .allowsHitTesting(false)
+        }
+    }
+
+    /// Deterministic RNG so grain does not thrash across view updates.
+    private struct SeededGenerator: RandomNumberGenerator {
+        private var state: UInt64
+
+        init(seed: UInt64) {
+            state = seed == 0 ? 0xDEADBEEF : seed
+        }
+
+        mutating func next() -> UInt64 {
+            // xorshift64*
+            state ^= state >> 12
+            state ^= state << 25
+            state ^= state >> 27
+            return state &* 0x2545F4914F6CDD1D
+        }
+    }
+
     // MARK: Embossed section label
     struct SectionLabel: View {
         let text: String
