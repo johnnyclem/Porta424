@@ -56,18 +56,6 @@ public struct TransportState: Codable, Equatable, Sendable {
     public init() {}
 }
 
-public struct TrackSegment: Codable, Equatable, Sendable {
-    public var url: URL
-    public var start: TimeInterval
-    public var duration: TimeInterval
-
-    public init(url: URL, start: TimeInterval, duration: TimeInterval) {
-        self.url = url
-        self.start = start
-        self.duration = duration
-    }
-}
-
 /// Multitrack mixer + transport host with optional PortaDSP tape insert on the stereo bus.
 @MainActor
 public final class Porta424Engine: ObservableObject {
@@ -76,6 +64,8 @@ public final class Porta424Engine: ObservableObject {
     @Published public private(set) var transport: TransportState = .init()
     @Published public private(set) var counterString: String = "00:00"
     @Published public private(set) var isRunning: Bool = false
+    /// Per-track region summary for UI (count / has tape).
+    @Published public private(set) var tapeTracks: [TapeTrackState] = TapeTimeline.trackStates(from: [[], [], [], []])
 
     public static let shared = Porta424Engine()
 
@@ -92,7 +82,13 @@ public final class Porta424Engine: ObservableObject {
 
     public var master: MasterState = .init()
 
-    public private(set) var trackSegments: [[TrackSegment]] = [[], [], [], []]
+    /// Four tape tracks of non-overlapping regions (after punch commits).
+    public private(set) var trackRegions: [[TapeRegion]] = [[], [], [], []]
+
+    /// Legacy view of regions (url/start/duration only).
+    public var trackSegments: [[TrackSegment]] {
+        trackRegions.map { $0.map(TrackSegment.init) }
+    }
 
     private let engine = AVAudioEngine()
     private let varispeed = AVAudioUnitVarispeed()
@@ -130,7 +126,13 @@ public final class Porta424Engine: ObservableObject {
     private var portaDSP: PortaDSPAudioUnit?
     private var lastTapeParams = PortaDSP.Params()
     private var liveInputSplit: AVAudioMixerNode?
-    private var hardwareInputConnected = false
+
+    /// Per-track record-source selectors (volume 0/1) — permanent graph wires.
+    /// Avoids disconnect/reconnect on arm/REC which triggers isInputConnToConverter.
+    private var recordSafeFeed: [AVAudioMixerNode] = []
+    private var recordBussFeed: [AVAudioMixerNode] = []
+    private var recordDirectFeed: [AVAudioMixerNode] = []
+    private var recordSum: [AVAudioMixerNode] = []
 
     private var displayTimer: Timer?
     private var playAnchorHostTime: UInt64?
@@ -140,6 +142,8 @@ public final class Porta424Engine: ObservableObject {
     private var recordStartPosition: TimeInterval = 0
     private var graphBuilt = false
     private var processingFormat: AVAudioFormat?
+    /// Host time when the current play schedule was built (for timed region starts).
+    private var playScheduleHostTime: UInt64?
 
     // MARK: - Lifecycle
 
@@ -151,86 +155,14 @@ public final class Porta424Engine: ObservableObject {
         engine.prepare()
         try engine.start()
         isRunning = true
-        #if !targetEnvironment(simulator)
-        // Device only: Simulator's inputNode often reports sampleRate=0 / invalid HW
-        // format, and `connect` then aborts with an uncatchable NSException
-        // ("Input HW format is invalid"). Keep silent live path on Simulator.
-        await ensureHardwareInputConnected(retries: 10)
-        #else
-        print("Porta424: Simulator — skipping hardware mic attach (use device for live input)")
-        #endif
+        // Do NOT rewire engine.inputNode after the graph is live.
+        // Reconnecting the hardware input (even with a “valid” format) throws an
+        // uncatchable NSException: isInputConnToConverter / Input HW format invalid
+        // on Simulator and often on device during session flips. Live path stays
+        // on the silent fan-out built in buildGraphAsync; device mic can be added
+        // later via a source node / manual render path without graph reconfig.
+        print("Porta424: engine running (live input uses graph silent source; no HW rewire)")
         startClock()
-    }
-
-    /// Device-only retries until the inputNode exposes a valid sample rate.
-    private func ensureHardwareInputConnected(retries: Int) async {
-        #if targetEnvironment(simulator)
-        return
-        #else
-        for attempt in 0..<retries {
-            if hardwareInputConnected { return }
-            if connectHardwareInputIfPossible() { return }
-            try? await Task.sleep(for: .milliseconds(200 + attempt * 50))
-            if !engine.isRunning {
-                try? engine.start()
-            }
-        }
-        print("Porta424: hardware input still unavailable after retries — live path stays silent")
-        #endif
-    }
-
-    /// Best-effort mic attach after the graph is already running.
-    /// Never call this on Simulator — invalid HW formats crash in AVFAudio.
-    @discardableResult
-    private func connectHardwareInputIfPossible() -> Bool {
-        #if targetEnvironment(simulator)
-        return false
-        #else
-        guard !hardwareInputConnected, let split = liveInputSplit else {
-            return hardwareInputConnected
-        }
-        let processing = processingFormat
-            ?? AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2)!
-        let input = engine.inputNode
-
-        // Strict validity: sampleRate MUST be > 0 or connect: aborts the process.
-        let hw = input.inputFormat(forBus: 0)
-        guard hw.sampleRate >= 8000, hw.channelCount >= 1, hw.channelCount <= 8 else {
-            print("Porta424: waiting for mic format (sr=\(hw.sampleRate) ch=\(hw.channelCount))")
-            return false
-        }
-
-        // Prefer the engine's current output format of the input node when valid.
-        let outFmt = input.outputFormat(forBus: 0)
-        let connectFormat: AVAudioFormat
-        if outFmt.sampleRate >= 8000, outFmt.channelCount >= 1 {
-            connectFormat = outFmt
-        } else if abs(hw.sampleRate - processing.sampleRate) < 1,
-                  hw.channelCount == processing.channelCount {
-            connectFormat = hw
-        } else if let forced = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: hw.sampleRate,
-            channels: min(2, hw.channelCount),
-            interleaved: false
-        ) {
-            connectFormat = forced
-        } else {
-            print("Porta424: could not build safe mic format; left silent")
-            return false
-        }
-
-        // Swap silent placeholder → hardware. Re-attach silent if anything looks wrong.
-        engine.disconnectNodeInput(split)
-        engine.connect(input, to: split, format: connectFormat)
-        hardwareInputConnected = true
-        print("Porta424: hardware input connected \(connectFormat.sampleRate)Hz/\(connectFormat.channelCount)ch")
-
-        if !engine.isRunning {
-            try? engine.start()
-        }
-        return true
-        #endif
     }
 
 
@@ -381,13 +313,35 @@ public final class Porta424Engine: ObservableObject {
         engine.connect(phonesMix, to: varispeed, format: format)
         engine.connect(varispeed, to: engine.outputNode, format: format)
 
-        // Record busses start on SAFE (rewireRecordBusses applies real routes).
+        // Permanent record routing graph (SAFE / BUSS / DIRECT via volumes only).
+        recordSafeFeed = (0..<4).map { _ in AVAudioMixerNode() }
+        recordBussFeed = (0..<4).map { _ in AVAudioMixerNode() }
+        recordDirectFeed = (0..<4).map { _ in AVAudioMixerNode() }
+        recordSum = (0..<4).map { _ in AVAudioMixerNode() }
+        (recordSafeFeed + recordBussFeed + recordDirectFeed + recordSum).forEach { engine.attach($0) }
+
         for i in 0..<4 {
+            // Silent SAFE source
             let silent = AVAudioMixerNode()
             silent.outputVolume = 0
             engine.attach(silent)
             safeSinks[i] = silent
-            engine.connect(silent, to: trackRecordBusses[i], format: format)
+            engine.connect(silent, to: recordSafeFeed[i], format: format)
+            engine.connect(recordSafeFeed[i], to: recordSum[i], format: format)
+
+            // BUSS: tracks 1&3 (i even) ← groupL, 2&4 (i odd) ← groupR
+            if i % 2 == 0 {
+                engine.connect(groupL, to: recordBussFeed[i], format: format)
+            } else {
+                engine.connect(groupR, to: recordBussFeed[i], format: format)
+            }
+            engine.connect(recordBussFeed[i], to: recordSum[i], format: format)
+
+            // DIRECT: strip post-EQ
+            engine.connect(stripNodes[i].postEQ, to: recordDirectFeed[i], format: format)
+            engine.connect(recordDirectFeed[i], to: recordSum[i], format: format)
+
+            engine.connect(recordSum[i], to: trackRecordBusses[i], format: format)
         }
 
         installMeterTaps(format: format)
@@ -533,32 +487,14 @@ public final class Porta424Engine: ObservableObject {
 
     private var safeSinks: [Int: AVAudioMixerNode] = [:]
 
+    /// Select SAFE / BUSS / DIRECT by gain only — never disconnect while running.
     private func rewireRecordBusses() {
-        let format = processingFormat ?? resolveProcessingFormat()
+        guard recordSum.count == 4 else { return }
         for i in 0..<4 {
-            engine.disconnectNodeInput(trackRecordBusses[i])
-            switch channels[i].recFunction {
-            case .safe:
-                let sink: AVAudioMixerNode
-                if let existing = safeSinks[i] {
-                    sink = existing
-                } else {
-                    let silent = AVAudioMixerNode()
-                    silent.outputVolume = 0
-                    engine.attach(silent)
-                    safeSinks[i] = silent
-                    sink = silent
-                }
-                engine.connect(sink, to: trackRecordBusses[i], format: format)
-            case .buss:
-                if i % 2 == 0 {
-                    engine.connect(groupL, to: trackRecordBusses[i], format: format)
-                } else {
-                    engine.connect(groupR, to: trackRecordBusses[i], format: format)
-                }
-            case .direct:
-                engine.connect(stripNodes[i].postEQ, to: trackRecordBusses[i], format: format)
-            }
+            let mode = channels[i].recFunction
+            recordSafeFeed[i].outputVolume = (mode == .safe) ? 1 : 0
+            recordBussFeed[i].outputVolume = (mode == .buss) ? 1 : 0
+            recordDirectFeed[i].outputVolume = (mode == .direct) ? 1 : 0
         }
     }
 
@@ -659,7 +595,9 @@ public final class Porta424Engine: ObservableObject {
         let format = processingFormat ?? resolveProcessingFormat()
 
         for i in 0..<4 {
-            guard channels[i].recArmed, channels[i].recFunction != .safe else { continue }
+            // Arm = non-SAFE rec function (424 RECORD FUNCTION switch) and/or recArmed flag.
+            let armed = channels[i].recFunction != .safe || channels[i].recArmed
+            guard armed, channels[i].recFunction != .safe else { continue }
             let url = tapeFileURL(track: i, stamp: Date().timeIntervalSince1970)
             do {
                 let writer = try AVAudioFile(
@@ -677,7 +615,6 @@ public final class Porta424Engine: ObservableObject {
 
         for i in 0..<4 {
             guard activeWriters[i] != nil else { continue }
-            // Record taps live on trackRecordBusses; meter taps stay on meterBusses.
             trackRecordBusses[i].removeTap(onBus: 0)
             trackRecordBusses[i].installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self] buffer, _ in
                 guard let self, self.transport.isRecording else { return }
@@ -692,65 +629,186 @@ public final class Porta424Engine: ObservableObject {
             trackRecordBusses[i].removeTap(onBus: 0)
             guard let file = activeWriters[i] else { continue }
             let duration = format.sampleRate > 0 ? Double(file.length) / format.sampleRate : 0
-            let segment = TrackSegment(url: file.url, start: recordStartPosition, duration: duration)
-            commitSegment(segment, toTrack: i)
+            if duration > 0.0005 {
+                let region = TapeRegion(
+                    url: file.url,
+                    start: recordStartPosition,
+                    duration: duration
+                )
+                commitRegion(region, toTrack: i)
+            }
             activeWriters[i] = nil
+        }
+        publishTapeTracks()
+    }
+
+    /// Punch-commit a new take onto a track timeline.
+    private func commitRegion(_ region: TapeRegion, toTrack index: Int) {
+        guard index >= 0, index < 4 else { return }
+        TapeTimeline.commit(region, into: &trackRegions[index])
+        publishTapeTracks()
+        if transport.isPlaying && !transport.isPaused {
+            if scheduleTrack(index, from: transport.position) {
+                safePlay(trackPlayers[index])
+            }
         }
     }
 
-    private func commitSegment(_ segment: TrackSegment, toTrack index: Int) {
-        trackSegments[index].removeAll { $0.start >= segment.start }
-        trackSegments[index].append(segment)
+    private func publishTapeTracks() {
+        tapeTracks = TapeTimeline.trackStates(from: trackRegions)
+    }
+
+    /// Clear all tape on every track (new cassette).
+    public func clearAllTape() {
+        trackRegions = [[], [], [], []]
+        publishTapeTracks()
+        if transport.isPlaying {
+            startPlayersFromCurrentPosition()
+        }
+    }
+
+    /// Clear a single track's regions.
+    public func clearTrack(_ trackIndex: Int) {
+        guard trackIndex >= 0, trackIndex < 4 else { return }
+        trackRegions[trackIndex] = []
+        publishTapeTracks()
         if transport.isPlaying && !transport.isPaused {
-            scheduleNextSegment(forTrack: index, from: transport.position)
-            trackPlayers[index].play()
+            if scheduleTrack(trackIndex, from: transport.position) {
+                safePlay(trackPlayers[trackIndex])
+            }
+        }
+    }
+
+    /// Ensure AVAudioEngine is actually running (I/O overload can pause it silently).
+    @discardableResult
+    private func ensureEngineRunning() -> Bool {
+        if engine.isRunning { return true }
+        do {
+            engine.prepare()
+            try engine.start()
+            isRunning = true
+            print("Porta424: engine restarted after pause/stop")
+            return true
+        } catch {
+            print("Porta424: engine restart failed: \(error)")
+            isRunning = false
+            return false
+        }
+    }
+
+    /// `AVAudioPlayerNode.play()` throws if the engine isn't running or the node
+    /// isn't in the graph — never let that NSException kill the app.
+    private func safePlay(_ player: AVAudioPlayerNode) {
+        guard ensureEngineRunning() else { return }
+        guard engine.attachedNodes.contains(where: { $0 === player }) else {
+            print("Porta424: skip play — player not attached")
+            return
+        }
+        // engine.attachedNodes is available; connection is established in buildGraph.
+        if !player.isPlaying {
+            player.play()
         }
     }
 
     private func startPlayersFromCurrentPosition() {
+        // Stop without tearing the play anchor twice: stopPlayers clears anchors
+        // when keepTime is true after reading them.
         stopPlayers(keepTime: true)
-        playAnchorHostTime = mach_absolute_time()
-        playAnchorPosition = transport.position
 
-        for i in 0..<4 {
-            scheduleNextSegment(forTrack: i, from: transport.position)
+        guard ensureEngineRunning() else {
+            print("Porta424: cannot start players — engine not running")
+            return
         }
 
+        playAnchorHostTime = mach_absolute_time()
+        playScheduleHostTime = playAnchorHostTime
+        playAnchorPosition = transport.position
+
         applyMaster()
-        trackPlayers.forEach { $0.play() }
+        for i in 0..<4 {
+            // Only start a player if it has scheduled audio. Calling play() on an
+            // idle/disconnected player after I/O pause throws NSException.
+            if scheduleTrack(i, from: transport.position) {
+                safePlay(trackPlayers[i])
+            }
+        }
         startClock()
     }
 
     private func stopPlayers(keepTime: Bool) {
-        trackPlayers.forEach { $0.stop() }
+        for player in trackPlayers {
+            if player.isPlaying {
+                player.stop()
+            }
+        }
         if let anchor = playAnchorHostTime, keepTime {
             let elapsed = hostSecondsSince(anchor)
             transport.position = max(0, playAnchorPosition + elapsed * Double(varispeed.rate))
         }
         playAnchorHostTime = nil
+        playScheduleHostTime = nil
         playAnchorPosition = transport.position
         updateCounterString()
     }
 
-    private func scheduleNextSegment(forTrack index: Int, from position: TimeInterval) {
+    /// Schedule every region on a track that still has audio after `position`,
+    /// using host-time starts so timeline gaps are preserved.
+    /// - Returns: `true` if at least one segment was scheduled.
+    @discardableResult
+    private func scheduleTrack(_ index: Int, from position: TimeInterval) -> Bool {
         let player = trackPlayers[index]
-        player.reset()
-        guard let segment = trackSegments[index]
-            .sorted(by: { $0.start < $1.start })
-            .first(where: { $0.start + $0.duration > position }) else { return }
-
-        do {
-            let file = try AVAudioFile(forReading: segment.url)
-            let sampleRate = file.processingFormat.sampleRate
-            let startOffsetSeconds = max(0, position - segment.start)
-            let startFrame = AVAudioFramePosition(startOffsetSeconds * sampleRate)
-            let remaining = max(0, segment.duration - startOffsetSeconds)
-            let frames = AVAudioFrameCount(remaining * sampleRate)
-            guard frames > 0 else { return }
-            player.scheduleSegment(file, startingFrame: startFrame, frameCount: frames, at: nil, completionHandler: nil)
-        } catch {
-            print("Porta424: schedule error: \(error)")
+        if player.isPlaying {
+            player.stop()
         }
+        // Prefer stop over reset: reset() can leave the node unusable when the
+        // engine has been paused by I/O overload.
+
+        let regions = TapeTimeline.playable(from: trackRegions[index], at: position)
+        guard !regions.isEmpty else { return false }
+
+        let anchorHost = playScheduleHostTime ?? mach_absolute_time()
+        let rate = max(0.25, Double(varispeed.rate))
+        var scheduled = 0
+
+        for region in regions {
+            let playFrom = max(position, region.start)
+            guard playFrom < region.end - 0.0005 else { continue }
+
+            let delaySec = (playFrom - position) / rate
+            let fileOffsetSec = region.fileOffset + (playFrom - region.start)
+            let playDuration = region.end - playFrom
+
+            do {
+                let file = try AVAudioFile(forReading: region.url)
+                let sampleRate = file.processingFormat.sampleRate
+                let startFrame = AVAudioFramePosition(max(0, fileOffsetSec) * sampleRate)
+                var frames = AVAudioFrameCount(playDuration * sampleRate)
+                if startFrame >= file.length { continue }
+                let maxFrames = AVAudioFrameCount(file.length - startFrame)
+                frames = min(frames, maxFrames)
+                guard frames > 0 else { continue }
+
+                let when: AVAudioTime?
+                if delaySec <= 0.001 {
+                    when = nil
+                } else {
+                    let hostTime = anchorHost &+ AVAudioTime.hostTime(forSeconds: delaySec)
+                    when = AVAudioTime(hostTime: hostTime)
+                }
+
+                player.scheduleSegment(
+                    file,
+                    startingFrame: startFrame,
+                    frameCount: frames,
+                    at: when,
+                    completionHandler: nil
+                )
+                scheduled += 1
+            } catch {
+                print("Porta424: schedule error track \(index + 1): \(error)")
+            }
+        }
+        return scheduled > 0
     }
 
     // MARK: - Clock

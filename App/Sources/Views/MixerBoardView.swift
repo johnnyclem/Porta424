@@ -354,11 +354,21 @@ private struct MixerChannelStrip: View {
 
     var body: some View {
         VStack(spacing: metrics.stripVSpacing) {
-            Text("\(channel.id)")
-                .font(.system(size: 12, weight: .black, design: .rounded))
-                .foregroundStyle(Porta.label)
-                .frame(width: 20, height: 20)
-                .background(Circle().fill(Porta.chassisDark.opacity(0.5)))
+            ZStack(alignment: .topTrailing) {
+                Text("\(channel.id)")
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(Porta.label)
+                    .frame(width: 20, height: 20)
+                    .background(Circle().fill(Porta.chassisDark.opacity(0.5)))
+
+                // Tape present indicator (tracks 1–4)
+                if index < 4, index < viewModel.tracksHaveTape.count, viewModel.tracksHaveTape[index] {
+                    Circle()
+                        .fill(Porta.ledGreen)
+                        .frame(width: 6, height: 6)
+                        .offset(x: 2, y: -2)
+                }
+            }
 
             RetroKnob(
                 value: $viewModel.channels[index].trim,

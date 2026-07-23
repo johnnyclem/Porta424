@@ -86,10 +86,14 @@ final class AudioEngineActor {
         var counterString: String
         var trackMeters: [Float]
         var tapeMetersDbFS: [Float]
+        /// Region counts per tape track (1–4).
+        var trackRegionCounts: [Int]
+        var tracksHaveTape: [Bool]
     }
 
     func snapshot() -> Snapshot {
         let t = deck.transport
+        let tracks = deck.tapeTracks
         return Snapshot(
             position: t.position,
             isPlaying: t.isPlaying,
@@ -97,8 +101,18 @@ final class AudioEngineActor {
             isRecording: t.isRecording,
             counterString: deck.counterString,
             trackMeters: deck.meters,
-            tapeMetersDbFS: deck.readTapeMeters()
+            tapeMetersDbFS: deck.readTapeMeters(),
+            trackRegionCounts: tracks.map(\.regionCount),
+            tracksHaveTape: tracks.map(\.hasTape)
         )
+    }
+
+    func clearAllTape() {
+        deck.clearAllTape()
+    }
+
+    func clearTrack(_ index: Int) {
+        deck.clearTrack(index)
     }
 
     // MARK: - Metering

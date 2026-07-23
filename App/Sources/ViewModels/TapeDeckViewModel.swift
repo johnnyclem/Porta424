@@ -19,6 +19,10 @@ final class TapeDeckViewModel {
     var meterR: Double = 0
     /// Per-track meters 0...1 (channels 1–4).
     var trackMeters: [Double] = [0, 0, 0, 0]
+    /// How many regions each tape track holds.
+    var trackRegionCounts: [Int] = [0, 0, 0, 0]
+    /// Whether each track has any audio committed.
+    var tracksHaveTape: [Bool] = [false, false, false, false]
     var tapePosition: Double = 0
     var counterSeconds: Double = 0
 
@@ -244,6 +248,13 @@ final class TapeDeckViewModel {
         if trackMeters.count < 4 { trackMeters = [0, 0, 0, 0] }
         for i in 0..<count {
             trackMeters[i] = Double(snap.trackMeters[i])
+        }
+
+        if snap.trackRegionCounts.count == 4 {
+            trackRegionCounts = snap.trackRegionCounts
+        }
+        if snap.tracksHaveTape.count == 4 {
+            tracksHaveTape = snap.tracksHaveTape
         }
     }
 }
